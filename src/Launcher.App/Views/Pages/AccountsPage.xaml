@@ -1,0 +1,173 @@
+<UserControl x:Class="Launcher.App.Views.Pages.AccountsPage"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:motion="clr-namespace:Launcher.App.Controls">
+ <UserControl.Resources>
+  <Style x:Key="SegmentButton" TargetType="RadioButton" BasedOn="{StaticResource AppleNavButtonStyle}">
+   <Setter Property="Height" Value="36"/><Setter Property="MinWidth" Value="88"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
+    <Border x:Name="Surface" CornerRadius="18" Background="Transparent" Padding="16,0"><ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/></Border>
+    <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#10007AFF"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".4"/></Trigger></ControlTemplate.Triggers>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
+ </UserControl.Resources>
+ <Grid Margin="32,24,32,28">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="16"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+  <DockPanel Grid.Row="0">
+   <Button DockPanel.Dock="Right" HorizontalAlignment="Right" Style="{StaticResource AppleSecondaryButton}" Content="添加账户 ﹀" Click="AddAccountClicked"/>
+   <TextBlock Text="账户" FontSize="28" FontWeight="Bold" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}"/>
+  </DockPanel>
+  <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+   <Grid x:Name="AccountCards" SizeChanged="CardsSizeChanged">
+    <Grid.ColumnDefinitions><ColumnDefinition Width=".9*"/><ColumnDefinition Width="20"/><ColumnDefinition Width="1.1*"/></Grid.ColumnDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Border x:Name="AccountListCard" Grid.Column="0" Style="{StaticResource AppleCard}" Padding="14" MinHeight="420">
+     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <TextBlock Text="我的账户" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,6,8,16"/>
+      <Grid Grid.Row="1">
+       <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="{Binding Accounts.Count, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}">
+        <motion:AccountAvatar Service="{Binding Main.Skins}" Width="64" Height="64" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+        <TextBlock Text="添加你的第一个账户" Foreground="{DynamicResource TextSecondaryBrush}"/>
+       </StackPanel>
+       <ListBox ItemsSource="{Binding Accounts}" Style="{StaticResource VirtualList}" MaxHeight="480" MinHeight="300">
+        <ListBox.ItemTemplate><DataTemplate>
+         <Border Style="{StaticResource SelectedItemRow}" Margin="0,4" Padding="12,14" Cursor="Hand" Focusable="True" MouseLeftButtonDown="AccountClicked" KeyDown="AccountKeyDown">
+          <Border.Tag><MultiBinding Converter="{StaticResource CurrentItemConverter}"><Binding/><Binding Path="DataContext.Main.CurrentAccount" RelativeSource="{RelativeSource AncestorType=UserControl}"/></MultiBinding></Border.Tag>
+          <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="54"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+           <motion:AccountAvatar Account="{Binding}" Service="{Binding DataContext.Main.Skins,RelativeSource={RelativeSource AncestorType=UserControl}}" Width="42" Height="42" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+           <StackPanel Grid.Column="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+             <TextBlock Text="{Binding KindLabel}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/>
+             <TextBlock Text=" · 当前" Foreground="{DynamicResource AccentBrush}" FontSize="12" Visibility="{Binding Tag,RelativeSource={RelativeSource AncestorType=Border},Converter={StaticResource BoolToVis}}"/>
+            </StackPanel>
+           </StackPanel>
+           <Button Grid.Column="2" Style="{StaticResource AppleIconButton}" Content="×" ToolTip="移除账户" Command="{Binding DataContext.DeleteAccountCommand,RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" Margin="8,0,0,0"/>
+          </Grid>
+         </Border>
+        </DataTemplate></ListBox.ItemTemplate>
+       </ListBox>
+      </Grid>
+     </Grid>
+    </Border>
+    <Border x:Name="SkinCard" Grid.Column="2" Style="{StaticResource AppleCard}" Padding="20" MinHeight="420">
+     <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="300"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <DockPanel>
+       <Button DockPanel.Dock="Right" Style="{StaticResource AppleIconButton}" Content="↺" ToolTip="重置视角" Click="ResetSkinCamera"/>
+       <TextBlock Text="{Binding Main.CurrentAccount.Name,TargetNullValue='Steve'}" FontSize="23" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+      </DockPanel>
+      <TextBlock Grid.Row="1" Text="{Binding Main.CurrentAccount.KindLabel,TargetNullValue='默认皮肤'}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0"/>
+      <Grid Grid.Row="2">
+       <motion:SkinPreview x:Name="Preview" TexturePath="{Binding PreviewTexturePath}" Model="{Binding PreviewModel}" Paused="{Binding PreviewPaused}"/>
+       <TextBlock Text="正在读取皮肤…" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,10" Visibility="{Binding IsSkinLoading,Converter={StaticResource BoolToVis}}" IsHitTestVisible="False"/>
+      </Grid>
+      <motion:SlidingTabStrip Grid.Row="3" SelectedKey="{Binding SkinModelKey}" HorizontalAlignment="Center" Margin="0,0,0,14" Visibility="{Binding ShowSkinEditor,Converter={StaticResource BoolToVis}}">
+       <StackPanel Orientation="Horizontal">
+        <RadioButton Style="{StaticResource SegmentButton}" Content="经典" IsChecked="{Binding SkinModelKey,Converter={StaticResource EqualConverter},ConverterParameter=Classic,Mode=OneWay}" Command="{Binding SelectSkinModelCommand}" CommandParameter="Classic"/>
+        <RadioButton Style="{StaticResource SegmentButton}" Content="纤细" IsChecked="{Binding SkinModelKey,Converter={StaticResource EqualConverter},ConverterParameter=Slim,Mode=OneWay}" IsEnabled="{Binding CanChooseSlim}" Command="{Binding SelectSkinModelCommand}" CommandParameter="Slim"/>
+       </StackPanel>
+      </motion:SlidingTabStrip>
+      <WrapPanel Grid.Row="4" HorizontalAlignment="Center">
+       <Button Style="{StaticResource AppleSecondaryButton}" Content="导入" Command="{Binding ImportSkinCommand}" IsEnabled="{Binding CanImportSkin}" Visibility="{Binding ShowSkinEditor,Converter={StaticResource BoolToVis}}" Margin="4"/>
+       <Button Style="{StaticResource AppleSecondaryButton}" Content="刷新" Command="{Binding RefreshSkinCommand}" Margin="4"/>
+       <Button Style="{StaticResource AppleSecondaryButton}" Content="导出" Command="{Binding ExportSkinCommand}" Margin="4"/>
+      </WrapPanel>
+      <StackPanel Grid.Row="5">
+       <Button Style="{StaticResource ApplePrimaryButton}" Content="{Binding ApplySkinLabel}" Command="{Binding ApplySkinCommand}" IsEnabled="{Binding CanApplySkin}" Visibility="{Binding ShowApplySkin,Converter={StaticResource BoolToVis}}" Margin="0,12,0,0"/>
+       <Button Style="{StaticResource AppleSecondaryButton}" Content="打开皮肤站 ↗" Command="{Binding OpenSkinWebsiteCommand}" Visibility="{Binding IsLittleSkinAccount,Converter={StaticResource BoolToVis}}" Margin="0,12,0,0"/>
+       <TextBlock Text="换皮肤请到在线网站，换完后刷新。" Foreground="#DA9423" FontSize="12" FontWeight="Medium" Margin="0,10,0,0" Visibility="{Binding IsLittleSkinAccount,Converter={StaticResource BoolToVis}}"/>
+       <Button Style="{StaticResource AppleSecondaryButton}" Content="取消" Command="{Binding CancelSkinOperationCommand}" Visibility="{Binding IsSkinOperation,Converter={StaticResource BoolToVis}}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+       <TextBlock Text="{Binding SkinStatus}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,0"/>
+      </StackPanel>
+     </Grid>
+    </Border>
+   </Grid>
+  </ScrollViewer>
+        <!-- Offline Login Modal -->
+        <Border Grid.Row="0" Grid.RowSpan="3" Background="#70000000" Margin="-32,-24,-32,-28"
+                motion:RevealMotion.Enabled="True" Visibility="{Binding ShowOfflineModal, Converter={StaticResource BoolToVis}}">
+            <Border Style="{StaticResource AppleCard}" Width="380" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+                <StackPanel>
+                    <TextBlock Text="添加离线账户" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,14" />
+                    <TextBlock Text="玩家名称 (1-16位字母、数字或下划线)" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" />
+                    <TextBox Style="{StaticResource AppleTextBox}" Text="{Binding OfflineName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,20" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Style="{StaticResource AppleSecondaryButton}" Content="取消" Command="{Binding CloseAllModalsCommand}" Margin="0,0,10,0" />
+                        <Button Style="{StaticResource ApplePrimaryButton}" Content="添加" Command="{Binding ConfirmOfflineLoginCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Microsoft Login Modal -->
+        <Border Grid.Row="0" Grid.RowSpan="3" Background="#70000000" Margin="-32,-24,-32,-28"
+                motion:RevealMotion.Enabled="True" Visibility="{Binding ShowMicrosoftModal, Converter={StaticResource BoolToVis}}">
+            <Border Style="{StaticResource AppleCard}" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+                <StackPanel>
+                    <TextBlock Text="微软正版登录" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
+                    <TextBlock Text="{Binding MicrosoftStatusText}" FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,16" />
+
+                    <!-- Device Code display -->
+                    <Border Background="#10007AFF" CornerRadius="12" Padding="16" Margin="0,0,0,16"
+                            Visibility="{Binding DeviceCode.Length, Converter={StaticResource BoolToVis}}">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="设备验证代码" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding DeviceCode}" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,4" />
+                            <TextBlock Text="在浏览器中输入此代码完成验证" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,16"
+                                Visibility="{Binding DeviceCode.Length, Converter={StaticResource BoolToVis}}">
+                        <Button Style="{StaticResource AppleSecondaryButton}" Content="复制验证码" Command="{Binding CopyDeviceCodeCommand}" Margin="0,0,10,0" />
+                        <Button Style="{StaticResource ApplePrimaryButton}" Content="打开验证页面" Command="{Binding OpenVerificationUrlCommand}" />
+                    </StackPanel>
+
+                    <Button Style="{StaticResource AppleSecondaryButton}" Content="取消" Command="{Binding CancelMicrosoftLoginCommand}" HorizontalAlignment="Right" />
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- LittleSkin Login Modal -->
+        <Border Grid.Row="0" Grid.RowSpan="3" Background="#70000000" Margin="-32,-24,-32,-28"
+                motion:RevealMotion.Enabled="True" Visibility="{Binding ShowLittleSkinModal, Converter={StaticResource BoolToVis}}">
+            <Border Style="{StaticResource AppleCard}" Width="400" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+                <StackPanel>
+                    <TextBlock Text="LittleSkin 登录" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6" />
+
+                    <!-- Credentials input -->
+                    <StackPanel Visibility="{Binding ShowLittleSkinProfilePicker, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}">
+                        <TextBlock Text="邮箱地址" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                        <TextBox Style="{StaticResource AppleTextBox}" Text="{Binding LittleSkinEmail, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+
+                        <TextBlock Text="密码" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
+                        <!-- Password box helper handled in view or simple input -->
+                        <PasswordBox x:Name="SkinPassword" Style="{StaticResource ApplePasswordBox}" PasswordChanged="SkinPasswordChanged" Margin="0,0,0,16" />
+
+                        <TextBlock Text="{Binding LittleSkinStatusText}" FontSize="12" Foreground="#FF3B30" Margin="0,0,0,12" TextWrapping="Wrap" />
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Style="{StaticResource AppleSecondaryButton}" Content="取消" Command="{Binding CloseAllModalsCommand}" Margin="0,0,10,0" />
+                            <Button Style="{StaticResource ApplePrimaryButton}" Content="登录" Command="{Binding StartLittleSkinLoginCommand}" IsEnabled="{Binding IsAuthenticatingLittleSkin, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Role Selection if multiple -->
+                    <StackPanel Visibility="{Binding ShowLittleSkinProfilePicker, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="检测到多个游戏角色，请选择：" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                        <ComboBox Style="{StaticResource AppleComboBox}" ItemsSource="{Binding LittleSkinProfiles}" 
+                                  SelectedItem="{Binding SelectedLittleSkinProfile}" Margin="0,0,0,20">
+  <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" ToolTip="{Binding Name}" TextTrimming="CharacterEllipsis"/></DataTemplate></ComboBox.ItemTemplate>
+ </ComboBox>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Style="{StaticResource AppleSecondaryButton}" Content="取消" Command="{Binding CloseAllModalsCommand}" Margin="0,0,10,0" />
+                            <Button Style="{StaticResource ApplePrimaryButton}" Content="确认角色" Command="{Binding ConfirmLittleSkinProfileCommand}" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Grid>
+</UserControl>
+

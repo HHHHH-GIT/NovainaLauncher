@@ -1,0 +1,37 @@
+# Build output and local tooling (also applies to nested projects)
+bin/
+obj/
+artifacts/
+TestResults/
+.vs/
+.idea/
+*.user
+*.suo
+*.pdb
+*.exe
+*.dll
+
+# Private launcher state, credentials, game files and Java
+data/
+runtime/
+logs/
+.minecraft/
+launcher-paths.json
+*.protected
+.env
+.env.*
+!.env.example
+*.local.json
+*.db
+*.db-shm
+*.db-wal
+
+# Video build products; commercial music is intentionally not distributed
+node_modules/
+/promo/output/
+/promo/public/assumptions.mp3
+__pycache__/
+*.pyc
+.cache/
+.DS_Store
+Thumbs.db

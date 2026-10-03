@@ -1,0 +1,27 @@
+<Application x:Class="Launcher.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Launcher.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Styles/Icons.xaml" />
+                <ResourceDictionary Source="Styles/AppleTheme.xaml" />
+                <ResourceDictionary Source="Styles/ControlTemplates.xaml" />
+                <ResourceDictionary Source="Styles/GlassTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            
+            
+            <local:StateConverter x:Key="BoolToVis" />
+            <local:EqualConverter x:Key="EqualConverter" />
+            <local:CurrentItemConverter x:Key="CurrentItemConverter" />
+            <local:LoaderIconConverter x:Key="LoaderIconConverter" />
+            <local:DanmakuActiveConverter x:Key="DanmakuActiveConverter" />
+
+            <Style TargetType="Window">
+                <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI, -apple-system, PingFang SC, Microsoft YaHei, sans-serif" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

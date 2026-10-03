@@ -1,0 +1,15 @@
+* text=auto eol=lf
+*.cs text eol=lf
+*.xaml text eol=lf
+*.csproj text eol=lf
+*.pubxml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.ps1 text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.wav binary

@@ -1,0 +1,20 @@
+<UserControl x:Class="Launcher.App.Controls.TaskProgressView"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:local="clr-namespace:Launcher.App.Controls" x:Name="ProgressRoot">
+ <UserControl.Resources><Style x:Key="OverallProgressStyle" TargetType="local:AnimatedStepProgressBar"><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="local:AnimatedStepProgressBar"><Grid ClipToBounds="True"><Border Background="{DynamicResource AppleSubtleHoverBrush}" CornerRadius="4"/><Border x:Name="PART_AnimatedFill" Background="{TemplateBinding Foreground}" CornerRadius="4"/></Grid></ControlTemplate></Setter.Value></Setter></Style></UserControl.Resources>
+ <StackPanel DataContext="{Binding Task,ElementName=ProgressRoot}">
+  <DockPanel Margin="0,0,0,7"><TextBlock Text="{Binding OverallCaption}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock Text="{Binding Detail}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" Margin="12,0,0,0"/></DockPanel>
+  <local:AnimatedStepProgressBar Value="{Binding Percent,Mode=OneWay}" Maximum="100" Style="{StaticResource OverallProgressStyle}" Height="8" Foreground="{Binding Accent,ElementName=ProgressRoot}"/>
+  <Expander x:Name="ProgressDetails" Header="进度详情" IsExpanded="{Binding IsExpanded,ElementName=ProgressRoot,Mode=TwoWay}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,10,0,0">
+   <StackPanel Margin="0,6,0,4">
+    <TextBlock Text="{Binding StageLabel}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+    <ProgressBar Value="{Binding StagePercent,Mode=OneWay}" IsIndeterminate="{Binding StageIndeterminate}" Maximum="100" Style="{StaticResource AppleProgressBar}" Height="5" Margin="0,8,0,6" Visibility="{Binding IsActive,Converter={StaticResource BoolToVis}}" Foreground="{Binding Accent,ElementName=ProgressRoot}"/>
+    <TextBlock Text="{Binding StageDetail}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+    <ItemsControl ItemsSource="{Binding Connections,ElementName=ProgressRoot}"><ItemsControl.ItemTemplate><DataTemplate>
+     <StackPanel Margin="0,6,0,10"><DockPanel><TextBlock Text="{Binding Progress.Label}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/><TextBlock Text="{Binding Progress.FileName}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextTrimming="CharacterEllipsis" Margin="12,0,0,0"/></DockPanel><ProgressBar Value="{Binding Progress.Percent,Mode=OneWay}" Maximum="100" Style="{StaticResource AppleProgressBar}" Height="4" Margin="0,6,0,5"/><TextBlock Text="{Binding Progress.Detail}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/></StackPanel>
+    </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+    <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="#DA5963" FontSize="12"/>
+   </StackPanel>
+  </Expander>
+ </StackPanel>
+</UserControl>

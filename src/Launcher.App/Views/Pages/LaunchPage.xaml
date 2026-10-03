@@ -1,0 +1,160 @@
+<UserControl x:Class="Launcher.App.Views.Pages.LaunchPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Launcher.App.ViewModels" xmlns:motion="clr-namespace:Launcher.App.Controls"
+             mc:Ignorable="d" 
+             d:DataContext="{d:DesignInstance Type=vm:LaunchViewModel}">
+
+    
+
+    <Grid Margin="32,24,32,28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header / Greeting -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,24">
+            <TextBlock Text="{Binding Main.CurrentAccount.Name, StringFormat='你好，{0}', FallbackValue='欢迎使用 Novaina'}"
+                       FontSize="28" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
+        </StackPanel>
+
+        <!-- Central Overview / Cards Grid -->
+        <Grid Grid.Row="1" VerticalAlignment="Center">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Account Card -->
+            <Border Grid.Column="0" Style="{StaticResource AppleCard}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Grid.Row="0">
+                        <Path Data="{StaticResource IconAccounts}" Fill="{DynamicResource AccentBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0" />
+                        <TextBlock Text="当前账户" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,16">
+                        <motion:AccountAvatar Account="{Binding Main.CurrentAccount}" Service="{Binding Main.Skins}" Width="52" Height="52" HorizontalAlignment="Left" Margin="0,0,0,10"/>
+                        <TextBlock Text="{Binding Main.CurrentAccount.Name, FallbackValue='未登录'}" 
+                                   FontSize="18" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                        <Border Background="#12007AFF" CornerRadius="6" Padding="6,2" HorizontalAlignment="Left" Margin="0,6,0,0">
+                            <TextBlock Text="{Binding Main.CurrentAccount.KindLabel, FallbackValue='请添加账户'}" 
+                                       FontSize="11" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" />
+                        </Border>
+                    </StackPanel>
+
+                    <Button Grid.Row="2" Style="{StaticResource AppleSecondaryButton}" Content="管理账户" Command="{Binding GoToAccountsCommand}" HorizontalAlignment="Stretch" />
+                </Grid>
+            </Border>
+
+            <!-- Version Card -->
+            <Border Grid.Column="2" Style="{StaticResource AppleCard}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Grid.Row="0">
+                        <Path Data="{StaticResource IconVersions}" Fill="{DynamicResource AccentBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0" />
+                        <TextBlock Text="游戏版本" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,16">
+                        <TextBlock Text="{Binding Main.CurrentVersion.GameName, FallbackValue='未选择版本'}" 
+                                   FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                        
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Border Background="#14007AFF" CornerRadius="6" Padding="6,2" Margin="0,0,6,0">
+                                <TextBlock Text="{Binding Main.CurrentVersion.Loader, FallbackValue='原版'}" 
+                                           FontSize="11" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" />
+                            </Border>
+                            <Border Background="#12000000" CornerRadius="6" Padding="6,2">
+                                <TextBlock Text="{Binding Main.CurrentVersion.Detail, FallbackValue='待扫描'}" 
+                                           FontSize="11" FontWeight="Medium" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Button Grid.Row="2" Style="{StaticResource AppleSecondaryButton}" Content="选择版本" Command="{Binding GoToVersionsCommand}" HorizontalAlignment="Stretch" />
+                </Grid>
+            </Border>
+
+            <!-- Java Runtime Card -->
+            <Border Grid.Column="4" Style="{StaticResource AppleCard}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Grid.Row="0">
+                        <Path Data="{StaticResource IconSettings}" Fill="{DynamicResource AccentBrush}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0" />
+                        <TextBlock Text="运行环境" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,16">
+                        <TextBlock Text="{Binding Main.CurrentJava.Label, FallbackValue='自动检测 Java'}" 
+                                   FontSize="16" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Main.CurrentJava.Path, FallbackValue='请在设置中检查 Java'}" 
+                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,6,0,0" />
+                    </StackPanel>
+
+                    <Button Grid.Row="2" Style="{StaticResource AppleSecondaryButton}" Content="Java 设置" Command="{Binding GoToSettingsCommand}" HorizontalAlignment="Stretch" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Launch Control Panel -->
+        <Border Grid.Row="2" Style="{StaticResource AppleCard}" Padding="20,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Status & Progress -->
+                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Main.LaunchStatusText}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="330" />
+                        <TextBlock Text="{Binding Main.LaunchProgress, StringFormat=' ({0:F0}%)'}" 
+                                   FontSize="13" Foreground="{DynamicResource AccentBrush}" Margin="6,0,0,0"
+                                   Visibility="{Binding Main.IsLaunching, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                    <ProgressBar Style="{StaticResource AppleProgressBar}" Value="{Binding Main.LaunchProgress}" 
+                                 Margin="0,8,0,0" Maximum="100"
+                                 Visibility="{Binding Main.IsLaunching, Converter={StaticResource BoolToVis}}" />
+                </StackPanel>
+
+                <!-- Action Buttons -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource AppleSecondaryButton}" Content="取消" Margin="0,0,12,0" 
+                            Command="{Binding CancelLaunchCommand}"
+                            Visibility="{Binding Main.CanCancelLaunch, Converter={StaticResource BoolToVis}}" />
+
+                    <Button Style="{StaticResource ApplePrimaryButton}" Command="{Binding LaunchGameCommand}" IsEnabled="{Binding Main.IsLaunching, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconPlay}" Fill="{DynamicResource TextWhiteBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,8,0" />
+                            <TextBlock Text="启动游戏" FontSize="16" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

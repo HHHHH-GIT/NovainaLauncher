@@ -1,0 +1,18 @@
+{
+  "name": "novaina-launch-film",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "studio": "remotion studio src/index.tsx", "stills": "node render.mjs stills", "render": "node render.mjs video" },
+  "dependencies": {
+    "@remotion/bundler": "4.0.532",
+    "@remotion/cli": "4.0.532",
+    "@remotion/renderer": "4.0.532",
+    "remotion": "4.0.532",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "ffmpeg-static": "5.3.0",
+    "ffprobe-static": "3.1.0",
+    "skinview3d": "3.4.2"
+  },
+  "devDependencies": { "typescript": "5.9.3", "@types/react": "19.2.2" }
+}

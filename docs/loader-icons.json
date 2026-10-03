@@ -1,0 +1,32 @@
+[
+  {
+    "path": "src\\Launcher.App\\Assets\\Loaders\\NeoForge.png",
+    "source": "https://raw.githubusercontent.com/neoforged/.github/main/art/neoforged_icon_16x16.png",
+    "sha256": "05AC21262EBF28FB3304B7BE9FF48040F57972D71BD128FB6FA041E3EEEA0238"
+  },
+  {
+    "path": "src\\Launcher.App\\Assets\\Loaders\\Quilt.png",
+    "source": "https://raw.githubusercontent.com/QuiltMC/art/master/brand/1024png/quilt_mini_icon_transparent.png",
+    "sha256": "C71FF5B64E437FE6C2D45F15AB2ED3C7C01F6EDC1060DB2487AC54871615A91C"
+  },
+  {
+    "path": "src\\Launcher.App\\Assets\\Loaders\\Forge.ico",
+    "source": "https://files.minecraftforge.net/favicon.ico",
+    "sha256": "529F665228364037087E7DD462B6C73BE44E89FBBC23E0CF99CDE6326C5A32DD"
+  },
+  {
+    "path": "src\\Launcher.App\\Assets\\Loaders\\OptiFine.ico",
+    "source": "https://optifine.net/favicon.ico",
+    "sha256": "352472179CED27CAD498E0492F64AC45C694802F0DBEA0C513E66848D353DE95"
+  },
+  {
+    "path": "src\\Launcher.App\\Assets\\Loaders\\Fabric.png",
+    "source": "https://raw.githubusercontent.com/FabricMC/fabricmc.net/main/assets/logo.png",
+    "sha256": "A41878C3C4C5790CFC920EABF98D3404103A74A6F3DF69D632CEB220C9EC9DC7"
+  },
+  {
+    "path": "src\\Launcher.App\\Assets\\Loaders\\Vanilla.png",
+    "source": "https://raw.githubusercontent.com/magicus/minecraft-launcher-icons/main/backgrounds/grass_block.png",
+    "sha256": "AEE29A2602C1D8F761C71391A6B03F622F584CCECCB0CE039424BD435C28BA60"
+  }
+]

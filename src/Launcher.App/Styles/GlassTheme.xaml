@@ -1,0 +1,122 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:motion="clr-namespace:Launcher.App.Controls">
+ <ResourceDictionary.MergedDictionaries><ResourceDictionary Source="AiTheme.xaml"/></ResourceDictionary.MergedDictionaries>
+ <SolidColorBrush x:Key="ControlBrush" Color="#DDE5ECF5"/>
+ <SolidColorBrush x:Key="GlassEdgeBrush" Color="#30000000"/>
+ <SolidColorBrush x:Key="GlassHoverEdgeBrush" Color="#40828F9F"/>
+ <SolidColorBrush x:Key="GlassHoverTintBrush" Color="#14007AFF"/>
+ <Color x:Key="GlassHighlightColor">#9A52A4FF</Color>
+ <CornerRadius x:Key="ButtonCornerRadius">20</CornerRadius>
+ <SolidColorBrush x:Key="PrimaryEdgeBrush" Color="#24000000"/>
+ <SolidColorBrush x:Key="PrimaryHoverTintBrush" Color="#16FFFFFF"/>
+ <SolidColorBrush x:Key="DialogSurfaceBrush" Color="#FFFCFDFE"/>
+ <SolidColorBrush x:Key="DialogEdgeBrush" Color="#507A8799"/>
+ <SolidColorBrush x:Key="ModalShadeBrush" Color="#260F1C30"/>
+ <LinearGradientBrush x:Key="GlassLightBrush" StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#50FFFFFF" Offset="0"/><GradientStop Color="#08FFFFFF" Offset="0.55"/><GradientStop Color="#04000000" Offset="1"/></LinearGradientBrush>
+ <ControlTemplate x:Key="GlassButtonTemplate" TargetType="Button">
+  <Grid>
+   <Border x:Name="Surface" CornerRadius="{StaticResource ButtonCornerRadius}" Background="{TemplateBinding Background}" BorderThickness="0" BorderBrush="{DynamicResource GlassEdgeBrush}"/>
+   <Border CornerRadius="{StaticResource ButtonCornerRadius}" Background="{DynamicResource GlassLightBrush}" IsHitTestVisible="False"/>
+   <Border x:Name="HoverTint" CornerRadius="{StaticResource ButtonCornerRadius}" Opacity="0" Background="{DynamicResource GlassHoverTintBrush}" IsHitTestVisible="False"/>
+   <Border x:Name="PART_Highlight" CornerRadius="{StaticResource ButtonCornerRadius}" Opacity="0" IsHitTestVisible="False"><Border.Background><RadialGradientBrush Center="0.5,0.2" GradientOrigin="0.5,0.2" RadiusX="0.65" RadiusY="1.5"><GradientStop Color="{DynamicResource GlassHighlightColor}" Offset="0"/><GradientStop Color="#40FFFFFF" Offset="0.5"/><GradientStop Color="#00FFFFFF" Offset="1"/></RadialGradientBrush></Border.Background></Border>
+   <Border CornerRadius="{StaticResource ButtonCornerRadius}" BorderThickness="1" BorderBrush="{Binding BorderBrush,ElementName=Surface}" IsHitTestVisible="False"/>
+   <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+  </Grid>
+  <ControlTemplate.Triggers>
+   <Trigger Property="motion:InteractionMotion.IsHovered" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource GlassHoverEdgeBrush}"/><Setter TargetName="HoverTint" Property="Opacity" Value="1"/></Trigger>
+   <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/></Trigger>
+   <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.78"/></Trigger>
+   <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.42"/></Trigger>
+  </ControlTemplate.Triggers>
+ </ControlTemplate>
+ <ControlTemplate x:Key="PrimaryGlassButtonTemplate" TargetType="Button">
+  <Grid>
+   <Border x:Name="Surface" CornerRadius="{StaticResource ButtonCornerRadius}" Background="{TemplateBinding Background}"/>
+   <Border x:Name="HoverTint" CornerRadius="{StaticResource ButtonCornerRadius}" Background="{DynamicResource PrimaryHoverTintBrush}" Opacity="0" IsHitTestVisible="False"/>
+   <Border x:Name="PART_Highlight" CornerRadius="{StaticResource ButtonCornerRadius}" Opacity="0" IsHitTestVisible="False"><Border.Background><RadialGradientBrush Center="0.5,0" GradientOrigin="0.5,0" RadiusX="0.8" RadiusY="1.3"><GradientStop Color="#55FFFFFF" Offset="0"/><GradientStop Color="#00FFFFFF" Offset="1"/></RadialGradientBrush></Border.Background></Border>
+   <Border x:Name="Edge" CornerRadius="{StaticResource ButtonCornerRadius}" BorderThickness="1" BorderBrush="{DynamicResource PrimaryEdgeBrush}" IsHitTestVisible="False"/>
+   <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+  </Grid>
+  <ControlTemplate.Triggers>
+   <Trigger Property="motion:InteractionMotion.IsHovered" Value="True"><Setter TargetName="HoverTint" Property="Opacity" Value="1"/></Trigger>
+   <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Edge" Property="BorderBrush" Value="White"/><Setter TargetName="Edge" Property="BorderThickness" Value="2"/></Trigger>
+   <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.86"/></Trigger>
+   <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.42"/></Trigger>
+  </ControlTemplate.Triggers>
+ </ControlTemplate>
+ <Style x:Key="GlassButtonBase" TargetType="Button">
+  <Setter Property="motion:InteractionMotion.Enabled" Value="True"/><Setter Property="Height" Value="40"/><Setter Property="FontSize" Value="14"/><Setter Property="FontWeight" Value="Medium"/>
+  <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/><Setter Property="Background" Value="{DynamicResource ControlBrush}"/><Setter Property="Padding" Value="18,0"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template" Value="{StaticResource GlassButtonTemplate}"/>
+ </Style>
+ <Style x:Key="AppleSecondaryButton" TargetType="Button" BasedOn="{StaticResource GlassButtonBase}"/>
+ <Style x:Key="ApplePrimaryButton" TargetType="Button" BasedOn="{StaticResource GlassButtonBase}"><Setter Property="Background" Value="{DynamicResource AccentBrush}"/><Setter Property="Foreground" Value="White"/><Setter Property="Template" Value="{StaticResource PrimaryGlassButtonTemplate}"/></Style>
+ <Style x:Key="DialogCard" TargetType="Border"><Setter Property="Background" Value="{DynamicResource DialogSurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource DialogEdgeBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="20"/><Setter Property="Effect"><Setter.Value><DropShadowEffect Color="#18263B" Opacity="0.18" BlurRadius="22" ShadowDepth="5"/></Setter.Value></Setter></Style>
+ <Style x:Key="AppleIconButton" TargetType="Button" BasedOn="{StaticResource GlassButtonBase}"><Setter Property="Width" Value="40"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/></Style>
+ <Style x:Key="VirtualList" TargetType="ListBox">
+  <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/>
+  <Setter Property="ScrollViewer.CanContentScroll" Value="True"/><Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/><Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+  <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/><Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/><Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel"/><Setter Property="VirtualizingPanel.CacheLength" Value="1"/>
+  <Setter Property="ItemsPanel"><Setter.Value><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></Setter.Value></Setter>
+  <Setter Property="ItemContainerStyle"><Setter.Value><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Focusable" Value="False"/><Setter Property="Padding" Value="0"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><ContentPresenter HorizontalAlignment="Stretch"/></ControlTemplate></Setter.Value></Setter></Style></Setter.Value></Setter>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBox"><ScrollViewer x:Name="PART_ScrollViewer" CanContentScroll="True" Focusable="False" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><ItemsPresenter/></ScrollViewer></ControlTemplate></Setter.Value></Setter>
+ </Style>
+ <Style x:Key="SettingsSectionTitle" TargetType="TextBlock"><Setter Property="FontSize" Value="16"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/><Setter Property="Margin" Value="4,0,0,12"/></Style>
+ <Style x:Key="SettingsRowLabel" TargetType="TextBlock"><Setter Property="FontSize" Value="14"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+ <Style x:Key="SettingsSubNav" TargetType="RadioButton" BasedOn="{StaticResource AppleNavButtonStyle}"><Setter Property="Height" Value="34"/><Setter Property="FontSize" Value="12"/></Style>
+ <Style x:Key="GlassTab" TargetType="RadioButton" BasedOn="{StaticResource AppleNavButtonStyle}">
+  <Setter Property="Height" Value="36"/><Setter Property="Margin" Value="2,0"/>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
+   <Border x:Name="Tab" CornerRadius="18" Background="Transparent" Padding="16,0"><ContentPresenter VerticalAlignment="Center"/></Border>
+   <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Tab" Property="Background" Value="#12007AFF"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Tab" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter TargetName="Tab" Property="BorderThickness" Value="1"/></Trigger></ControlTemplate.Triggers>
+  </ControlTemplate></Setter.Value></Setter>
+ </Style>
+ <Style x:Key="GlassCheck" TargetType="CheckBox">
+  <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="Cursor" Value="Hand"/>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
+   <StackPanel Orientation="Horizontal"><Border x:Name="Box" Width="20" Height="20" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource GlassEdgeBrush}" Background="{DynamicResource ControlBrush}" Margin="0,0,8,0"><TextBlock x:Name="Check" Text="✓" Visibility="Collapsed" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13"/></Border><ContentPresenter VerticalAlignment="Center"/></StackPanel>
+   <ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Box" Property="Background" Value="{DynamicResource AccentBrush}"/><Setter TargetName="Check" Property="Visibility" Value="Visible"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/></Trigger></ControlTemplate.Triggers>
+  </ControlTemplate></Setter.Value></Setter>
+ </Style>
+ <Style x:Key="GlassSwitch" TargetType="CheckBox">
+  <Setter Property="Cursor" Value="Hand"/><Setter Property="Width" Value="48"/><Setter Property="Height" Value="28"/>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
+   <Border x:Name="SwitchTrack" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource GlassEdgeBrush}" BorderThickness="1" CornerRadius="14">
+    <Border x:Name="SwitchThumb" Width="22" Height="22" CornerRadius="11" Background="White" HorizontalAlignment="Left" Margin="2"/>
+   </Border>
+   <ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="SwitchTrack" Property="Background" Value="{DynamicResource AccentBrush}"/><Setter TargetName="SwitchThumb" Property="HorizontalAlignment" Value="Right"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="2"/></Trigger></ControlTemplate.Triggers>
+  </ControlTemplate></Setter.Value></Setter>
+ </Style>
+ <Style x:Key="AnimationModeSlider" TargetType="Slider">
+  <Setter Property="Height" Value="36"/><Setter Property="IsMoveToPointEnabled" Value="True"/>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Slider">
+   <Grid x:Name="PART_Surface">
+    <Border CornerRadius="18" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource AppleCardBorderBrush}" BorderThickness="1"/>
+    <Border x:Name="PART_Fill" Width="0" HorizontalAlignment="Left" Margin="2" CornerRadius="16" Background="{DynamicResource AiAccentBrush}" IsHitTestVisible="False"/>
+    <Track x:Name="PART_Track" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value}" Margin="2">
+     <Track.DecreaseRepeatButton><RepeatButton Style="{StaticResource ScrollPageButton}" Command="Slider.DecreaseLarge"/></Track.DecreaseRepeatButton>
+     <Track.Thumb><Thumb Width="32" Height="32"><Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="White" CornerRadius="16" BorderBrush="#18000000" BorderThickness="1"><Border.Effect><DropShadowEffect Color="#000000" Opacity="0.13" BlurRadius="6" ShadowDepth="1"/></Border.Effect></Border></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+     <Track.IncreaseRepeatButton><RepeatButton Style="{StaticResource ScrollPageButton}" Command="Slider.IncreaseLarge"/></Track.IncreaseRepeatButton>
+    </Track>
+    <Grid IsHitTestVisible="False" Margin="17,0">
+     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+     <Ellipse Width="4" Height="4" HorizontalAlignment="Left"><Ellipse.Style><Style TargetType="Ellipse"><Setter Property="Fill" Value="#90FFFFFF"/><Style.Triggers><DataTrigger Binding="{Binding Value,RelativeSource={RelativeSource TemplatedParent}}" Value="0"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Ellipse.Style></Ellipse>
+     <Ellipse Grid.Column="1" Width="4" Height="4"><Ellipse.Style><Style TargetType="Ellipse"><Setter Property="Fill" Value="#70808A98"/><Style.Triggers><DataTrigger Binding="{Binding Value,RelativeSource={RelativeSource TemplatedParent}}" Value="1"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger><DataTrigger Binding="{Binding Value,RelativeSource={RelativeSource TemplatedParent}}" Value="2"><Setter Property="Fill" Value="#90FFFFFF"/></DataTrigger></Style.Triggers></Style></Ellipse.Style></Ellipse>
+     <Ellipse Grid.Column="2" Width="4" Height="4" HorizontalAlignment="Right"><Ellipse.Style><Style TargetType="Ellipse"><Setter Property="Fill" Value="#70808A98"/><Style.Triggers><DataTrigger Binding="{Binding Value,RelativeSource={RelativeSource TemplatedParent}}" Value="2"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Ellipse.Style></Ellipse>
+    </Grid>
+
+   </Grid>
+  </ControlTemplate></Setter.Value></Setter>
+ </Style>
+ <Style TargetType="ContextMenu"><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ContextMenu"><Border Background="{DynamicResource PopupBrush}" BorderBrush="{DynamicResource GlassEdgeBrush}" BorderThickness="1" CornerRadius="16" Padding="6" MinWidth="160" motion:RevealMotion.Enabled="True"><StackPanel IsItemsHost="True"/></Border></ControlTemplate></Setter.Value></Setter></Style>
+ <Style TargetType="MenuItem"><Setter Property="Padding" Value="10,9"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="MenuItem">
+  <Border x:Name="MenuSurface" Padding="{TemplateBinding Padding}" CornerRadius="10" Background="Transparent"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock x:Name="Check" Text="✓" Foreground="{DynamicResource AccentBrush}" Visibility="Collapsed"/><ContentPresenter Grid.Column="1" ContentSource="Header"/></Grid></Border>
+  <ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="MenuSurface" Property="Background" Value="{DynamicResource ControlHoverBrush}"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="Check" Property="Visibility" Value="Visible"/></Trigger></ControlTemplate.Triggers>
+ </ControlTemplate></Setter.Value></Setter></Style>
+ <Style x:Key="SelectedItemRow" TargetType="Border">
+  <Setter Property="Background" Value="#06000000"/><Setter Property="CornerRadius" Value="12"/><Setter Property="BorderThickness" Value="1"/><Setter Property="BorderBrush" Value="Transparent"/>
+  <Style.Triggers><DataTrigger Binding="{Binding Tag,RelativeSource={RelativeSource Self}}" Value="True"><Setter Property="Background" Value="#22007AFF"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/></DataTrigger></Style.Triggers>
+ </Style>
+ <Style x:Key="CurrentItemButton" TargetType="Button" BasedOn="{StaticResource AppleSecondaryButton}">
+  <Setter Property="Content" Value="设为当前"/>
+  <Style.Triggers><DataTrigger Binding="{Binding Tag,RelativeSource={RelativeSource Self}}" Value="True"><Setter Property="Content" Value="✓ 当前"/><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></DataTrigger></Style.Triggers>
+ </Style>
+</ResourceDictionary>

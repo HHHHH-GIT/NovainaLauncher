@@ -1,0 +1,89 @@
+<UserControl x:Class="Launcher.App.Views.Pages.VersionContentPage"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:core="clr-namespace:Launcher.Core;assembly=Launcher.Core" xmlns:motion="clr-namespace:Launcher.App.Controls">
+ <UserControl.Resources>
+  <Style x:Key="GameTab" TargetType="RadioButton" BasedOn="{StaticResource AppleNavButtonStyle}">
+   <Setter Property="Height" Value="36"/><Setter Property="Margin" Value="2,0"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton"><Border x:Name="Tab" CornerRadius="18" Background="Transparent" Padding="14,0"><ContentPresenter VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Tab" Property="Background" Value="#12007AFF"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style x:Key="DetailLabel" TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Margin" Value="0,7,16,7"/></Style>
+  <Style x:Key="DetailValue" TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/><Setter Property="VerticalAlignment" Value="Center"/><Setter Property="Margin" Value="0,7,0,7"/><Setter Property="TextTrimming" Value="CharacterEllipsis"/></Style>
+ </UserControl.Resources>
+ <Grid Margin="32,24,32,28">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <DockPanel Margin="0,0,0,18">
+   <Button DockPanel.Dock="Left" Content="‹ 返回" Command="{Binding BackCommand}" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,16,0" VerticalAlignment="Center"/>
+   <Image DockPanel.Dock="Left" Source="{Binding Version.Loader,Converter={StaticResource LoaderIconConverter}}" Width="42" Height="42" Margin="0,0,12,0" RenderOptions.BitmapScalingMode="HighQuality"/>
+   <StackPanel><TextBlock Text="{Binding Title}" FontSize="26" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+    <TextBlock Text="{Binding VersionName}" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/></StackPanel>
+  </DockPanel>
+  <Border Grid.Row="1" Background="#09007AFF" CornerRadius="18" Padding="3" Margin="0,0,0,16" HorizontalAlignment="Left">
+   <motion:SlidingTabStrip SelectedKey="{Binding Section}">
+   <StackPanel Orientation="Horizontal" IsEnabled="{Binding CanBrowse}">
+    <RadioButton Content="概览" GroupName="GameSection" Style="{StaticResource GameTab}" Command="{Binding SwitchSectionCommand}" CommandParameter="Overview" IsChecked="{Binding Section,Converter={StaticResource EqualConverter},ConverterParameter=Overview,Mode=OneWay}"/>
+    <RadioButton Content="Mod" GroupName="GameSection" Style="{StaticResource GameTab}" Command="{Binding SwitchSectionCommand}" CommandParameter="Mods" IsChecked="{Binding Section,Converter={StaticResource EqualConverter},ConverterParameter=Mods,Mode=OneWay}"/>
+    <RadioButton Content="存档" GroupName="GameSection" Style="{StaticResource GameTab}" Command="{Binding SwitchSectionCommand}" CommandParameter="Saves" IsChecked="{Binding Section,Converter={StaticResource EqualConverter},ConverterParameter=Saves,Mode=OneWay}"/>
+    <RadioButton Content="资源包" GroupName="GameSection" Style="{StaticResource GameTab}" Command="{Binding SwitchSectionCommand}" CommandParameter="Packs" IsChecked="{Binding Section,Converter={StaticResource EqualConverter},ConverterParameter=Packs,Mode=OneWay}"/>
+    <RadioButton Content="光影包" GroupName="GameSection" Style="{StaticResource GameTab}" Command="{Binding SwitchSectionCommand}" CommandParameter="Shaders" IsChecked="{Binding Section,Converter={StaticResource EqualConverter},ConverterParameter=Shaders,Mode=OneWay}"/>
+   </StackPanel>
+   </motion:SlidingTabStrip>
+  </Border>
+  <Grid Grid.Row="2" x:Name="SectionBody" ClipToBounds="True" motion:SectionSlideMotion.Key="{Binding Section}">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="{Binding IsOverview,Converter={StaticResource BoolToVis}}">
+   <Border Style="{StaticResource AppleCard}" Padding="24">
+    <StackPanel>
+     <TextBlock Text="游戏名称" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+     <DockPanel Margin="0,0,0,18"><Button DockPanel.Dock="Right" Content="保存名称" Command="{Binding RenameCommand}" IsEnabled="{Binding CanRename}" Style="{StaticResource AppleSecondaryButton}" Margin="12,0,0,0"/><TextBox Text="{Binding GameNameDraft,UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource AppleTextBox}" IsEnabled="{Binding CanRename}" MaxLength="100"/></DockPanel>
+     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition/></Grid.ColumnDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <TextBlock Text="Minecraft" Style="{StaticResource DetailLabel}"/><TextBlock Grid.Column="1" Text="{Binding MinecraftLabel}" Style="{StaticResource DetailValue}"/>
+      <TextBlock Grid.Row="1" Text="加载器" Style="{StaticResource DetailLabel}"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LoaderLabel}" Style="{StaticResource DetailValue}"/>
+      <TextBlock Grid.Row="2" Text="运行环境" Style="{StaticResource DetailLabel}"/><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding JavaLabel}" Style="{StaticResource DetailValue}"/>
+      <TextBlock Grid.Row="3" Text="版本类型" Style="{StaticResource DetailLabel}"/><TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding TypeLabel}" Style="{StaticResource DetailValue}"/>
+      <TextBlock Grid.Row="4" Text="继承版本" Style="{StaticResource DetailLabel}"/><TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ParentLabel}" Style="{StaticResource DetailValue}" ToolTip="{Binding ParentLabel}"/>
+      <TextBlock Grid.Row="5" Text="版本目录" Style="{StaticResource DetailLabel}"/><TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding VersionDirectory}" Style="{StaticResource DetailValue}" ToolTip="{Binding VersionDirectory}"/>
+      <TextBlock Grid.Row="6" Text="游戏目录" Style="{StaticResource DetailLabel}"/><TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding GameDirectory}" Style="{StaticResource DetailValue}" ToolTip="{Binding GameDirectory}"/>
+      <TextBlock Grid.Row="7" Text="内容" Style="{StaticResource DetailLabel}"/><TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding ContentSummary}" Style="{StaticResource DetailValue}"/>
+     </Grid>
+     <TextBlock Text="{Binding Version.Error}" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+     <DockPanel Margin="0,16,0,0"><Button DockPanel.Dock="Right" Content="打开目录" Command="{Binding OpenFolderCommand}" Style="{StaticResource AppleSecondaryButton}"/><TextBlock Text="{Binding DirectoryLabel}" Style="{StaticResource DetailLabel}"/></DockPanel>
+     <WrapPanel Margin="0,20,0,0">
+      <Button Content="导出整合包" Command="{Binding ExportModpackCommand}" IsEnabled="{Binding CanRename}" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,12,0"/>
+      <Button Content="删除此游戏" Command="{Binding DeleteGameCommand}" IsEnabled="{Binding CanWrite}" Style="{StaticResource AppleSecondaryButton}" Foreground="#DC5863"/>
+     </WrapPanel>
+    </StackPanel>
+   </Border>
+  </ScrollViewer>
+  <Grid Visibility="{Binding IsContents,Converter={StaticResource BoolToVis}}">
+   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
+   <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,12">
+    <Button Content="导入" Command="{Binding ImportFilesCommand}" IsEnabled="{Binding CanWrite}" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,8,0"/>
+    <Button Content="导入文件夹" Command="{Binding ImportFolderCommand}" IsEnabled="{Binding CanWrite}" Margin="0,0,8,0">
+     <Button.Style><Style TargetType="Button" BasedOn="{StaticResource AppleSecondaryButton}"><Style.Triggers><DataTrigger Binding="{Binding Kind}" Value="{x:Static core:VersionContentKind.Mod}"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Button.Style>
+    </Button>
+    <Button Content="刷新" Command="{Binding RefreshCommand}" IsEnabled="{Binding CanBrowse}" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,8,0"/>
+    <Button Content="打开目录" Command="{Binding OpenFolderCommand}" Style="{StaticResource AppleSecondaryButton}"/>
+   </StackPanel>
+   <Border Grid.Row="1" Style="{StaticResource AppleCard}" Padding="10"><Grid>
+    <TextBlock Text="暂无内容" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Items.Count,Converter={StaticResource BoolToVis},ConverterParameter=Inverse}"/>
+    <ListBox Style="{StaticResource VirtualList}" ItemsSource="{Binding Items}"><ListBox.ItemTemplate><DataTemplate>
+     <Border Padding="14,10" Margin="0,3" CornerRadius="12" Background="#08007AFF"><Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <StackPanel Margin="0,0,16,0" VerticalAlignment="Center"><TextBlock Text="{Binding Name}" FontSize="15" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Detail}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0"/></StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" IsEnabled="{Binding DataContext.CanWrite,RelativeSource={RelativeSource AncestorType=UserControl}}">
+       <Button Content="{Binding ToggleLabel}" Command="{Binding DataContext.ToggleCommand,RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,8,0" Visibility="{Binding DataContext.CanToggle,RelativeSource={RelativeSource AncestorType=UserControl},Converter={StaticResource BoolToVis}}"/>
+       <Button Content="导出" Command="{Binding DataContext.ExportSaveCommand,RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,8,0" Visibility="{Binding DataContext.IsSave,RelativeSource={RelativeSource AncestorType=UserControl},Converter={StaticResource BoolToVis}}"/>
+       <Button Content="删除" Command="{Binding DataContext.DeleteCommand,RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" Style="{StaticResource AppleSecondaryButton}"/>
+      </StackPanel>
+     </Grid></Border>
+    </DataTemplate></ListBox.ItemTemplate></ListBox>
+   </Grid></Border>
+  </Grid>
+  </Grid>
+  <DockPanel Grid.Row="3" Margin="0,12,0,0">
+   <Button DockPanel.Dock="Right" Content="取消" Command="{Binding CancelCommand}" Visibility="{Binding IsBusy,Converter={StaticResource BoolToVis}}" Style="{StaticResource AppleSecondaryButton}"/>
+   <StackPanel><TextBlock Text="{Binding Status}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/><TextBlock Text="{Binding BusyNotice}" Foreground="{DynamicResource AccentBrush}"/></StackPanel>
+  </DockPanel>
+ </Grid>
+</UserControl>
+

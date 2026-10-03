@@ -1,0 +1,198 @@
+<UserControl x:Class="Launcher.App.Views.Pages.SettingsPage"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:motion="clr-namespace:Launcher.App.Controls">
+ <Grid>
+  <ScrollViewer x:Name="SettingsScroll" VerticalScrollBarVisibility="Auto" ScrollChanged="SettingsScrollChanged">
+   <StackPanel x:Name="SectionsPanel" Margin="32,24,32,32">
+    <TextBlock Text="设置" FontSize="26" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,24" />
+    <StackPanel x:Name="AppearanceSection" Tag="Appearance" Margin="0,0,0,24">
+     <TextBlock Text="外观与动画" Style="{StaticResource SettingsSectionTitle}" />
+     <Border Style="{StaticResource AppleCard}"><StackPanel>
+      <DockPanel Margin="0,0,0,18">
+       <Border DockPanel.Dock="Right" Width="300" Background="#09007AFF" CornerRadius="18" Padding="3">
+        <motion:SlidingTabStrip x:Name="ThemeSelector" SelectedKey="{Binding Theme}" AutomationProperties.Name="主题">
+         <UniformGrid Rows="1">
+          <RadioButton GroupName="ThemeTabs" Style="{StaticResource GlassTab}" Command="{Binding SelectThemeCommand}" CommandParameter="System" IsChecked="{Binding Theme,Converter={StaticResource EqualConverter},ConverterParameter=System,Mode=OneWay}" AutomationProperties.Name="跟随系统"><TextBlock Text="跟随系统" HorizontalAlignment="Center"/></RadioButton>
+          <RadioButton GroupName="ThemeTabs" Style="{StaticResource GlassTab}" Command="{Binding SelectThemeCommand}" CommandParameter="Light" IsChecked="{Binding Theme,Converter={StaticResource EqualConverter},ConverterParameter=Light,Mode=OneWay}" AutomationProperties.Name="浅色"><TextBlock Text="浅色" HorizontalAlignment="Center"/></RadioButton>
+          <RadioButton GroupName="ThemeTabs" Style="{StaticResource GlassTab}" Command="{Binding SelectThemeCommand}" CommandParameter="Dark" IsChecked="{Binding Theme,Converter={StaticResource EqualConverter},ConverterParameter=Dark,Mode=OneWay}" AutomationProperties.Name="深色"><TextBlock Text="深色" HorizontalAlignment="Center"/></RadioButton>
+         </UniformGrid>
+        </motion:SlidingTabStrip>
+       </Border>
+       <TextBlock Text="主题" Style="{StaticResource SettingsRowLabel}" />
+      </DockPanel>
+      <Grid Margin="0,0,0,18">
+       <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="300"/></Grid.ColumnDefinitions>
+       <TextBlock Text="动画" Style="{StaticResource SettingsRowLabel}" />
+       <StackPanel Grid.Column="1">
+        <TextBlock Text="{Binding AnimationLabel}" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,9" />
+        <motion:CapsuleSlider Style="{StaticResource AnimationModeSlider}" Value="{Binding AnimationIndex, Mode=TwoWay}" Minimum="0" Maximum="2" TickFrequency="1" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="1" AutomationProperties.Name="动画档位" />
+        <Grid Margin="10,9,10,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+         <TextBlock Text="关闭" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock Grid.Column="1" Text="性能" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock Grid.Column="2" Text="舒缓" HorizontalAlignment="Right" Foreground="{DynamicResource TextSecondaryBrush}"/>
+        </Grid>
+       </StackPanel>
+      </Grid>
+      <Grid Margin="0,18,0,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="300"/></Grid.ColumnDefinitions>
+       <TextBlock Text="整体透明度" Style="{StaticResource SettingsRowLabel}"/>
+       <StackPanel Grid.Column="1"><TextBlock Text="{Binding TransparencyLabel}" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right" Margin="0,0,0,8"/>
+        <Slider Minimum="0" Maximum="50" SmallChange="1" LargeChange="5" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding WindowTransparencyPercent,Mode=TwoWay}" AutomationProperties.Name="整体透明度"/>
+       </StackPanel>
+      </Grid>
+     </StackPanel></Border>
+    </StackPanel>
+    <StackPanel x:Name="DanmakuSection" Tag="Danmaku" Margin="0,0,0,24">
+     <TextBlock Text="弹幕" Style="{StaticResource SettingsSectionTitle}"/>
+     <Border Style="{StaticResource AppleCard}"><StackPanel>
+      <DockPanel Margin="0,0,0,18">
+       <Border DockPanel.Dock="Right" Background="#09007AFF" CornerRadius="18" Padding="3">
+        <motion:SlidingTabStrip SelectedKey="{Binding DanmakuModeKey}"><StackPanel Orientation="Horizontal">
+         <RadioButton Content="关闭" GroupName="DanmakuModeTabs" Style="{StaticResource GlassTab}" Command="{Binding SelectDanmakuModeCommand}" CommandParameter="Off" IsChecked="{Binding DanmakuModeKey,Converter={StaticResource EqualConverter},ConverterParameter=Off,Mode=OneWay}"/>
+         <RadioButton Content="精选" GroupName="DanmakuModeTabs" Style="{StaticResource GlassTab}" Command="{Binding SelectDanmakuModeCommand}" CommandParameter="Selected" IsChecked="{Binding DanmakuModeKey,Converter={StaticResource EqualConverter},ConverterParameter=Selected,Mode=OneWay}"/>
+         <RadioButton Content="全部" GroupName="DanmakuModeTabs" Style="{StaticResource GlassTab}" Command="{Binding SelectDanmakuModeCommand}" CommandParameter="All" IsChecked="{Binding DanmakuModeKey,Converter={StaticResource EqualConverter},ConverterParameter=All,Mode=OneWay}"/>
+        </StackPanel></motion:SlidingTabStrip>
+       </Border><TextBlock Text="显示" Style="{StaticResource SettingsRowLabel}"/>
+      </DockPanel>
+      <DockPanel Margin="0,0,0,18">
+       <Border DockPanel.Dock="Right" Background="#09007AFF" CornerRadius="18" Padding="3">
+        <motion:SlidingTabStrip SelectedKey="{Binding DanmakuStyleKey}"><StackPanel Orientation="Horizontal">
+         <RadioButton Content="琉璃笺" GroupName="DanmakuStyleTabs" Style="{StaticResource GlassTab}" Command="{Binding SelectDanmakuStyleCommand}" CommandParameter="Glass" IsChecked="{Binding DanmakuStyleKey,Converter={StaticResource EqualConverter},ConverterParameter=Glass,Mode=OneWay}"/>
+         <RadioButton Content="墨流" GroupName="DanmakuStyleTabs" Style="{StaticResource GlassTab}" Command="{Binding SelectDanmakuStyleCommand}" CommandParameter="Ink" IsChecked="{Binding DanmakuStyleKey,Converter={StaticResource EqualConverter},ConverterParameter=Ink,Mode=OneWay}"/>
+         <RadioButton Content="虹渡" GroupName="DanmakuStyleTabs" Style="{StaticResource GlassTab}" Command="{Binding SelectDanmakuStyleCommand}" CommandParameter="Rainbow" IsChecked="{Binding DanmakuStyleKey,Converter={StaticResource EqualConverter},ConverterParameter=Rainbow,Mode=OneWay}"/>
+        </StackPanel></motion:SlidingTabStrip>
+       </Border><TextBlock Text="样式" Style="{StaticResource SettingsRowLabel}"/>
+      </DockPanel>
+      <Grid Margin="0,0,0,18"><Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition/></Grid.ColumnDefinitions>
+       <TextBlock Text="屏蔽" Style="{StaticResource SettingsRowLabel}"/>
+       <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
+        <CheckBox Content="log4j" IsChecked="{Binding BlockLog4j}" Style="{StaticResource GlassCheck}" Margin="0,6,18,6"/>
+        <CheckBox Content="authlib-injector" IsChecked="{Binding BlockAuthlibInjector}" Style="{StaticResource GlassCheck}" Margin="0,6,18,6"/>
+        <CheckBox Content="warn" IsChecked="{Binding BlockWarn}" Style="{StaticResource GlassCheck}" Margin="0,6,18,6"/>
+        <CheckBox Content="error" IsChecked="{Binding BlockError}" Style="{StaticResource GlassCheck}" Margin="0,6,0,6"/>
+       </WrapPanel>
+      </Grid>
+      <DockPanel><Button DockPanel.Dock="Right" Content="添加规则" Command="{Binding AddDanmakuRuleCommand}" Style="{StaticResource AppleSecondaryButton}"/><TextBlock Text="自定义屏蔽" Style="{StaticResource SettingsRowLabel}"/></DockPanel>
+      <ItemsControl ItemsSource="{Binding DanmakuRules}"><ItemsControl.ItemTemplate><DataTemplate>
+       <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="32"/><ColumnDefinition Width="110"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <CheckBox IsChecked="{Binding Enabled}" Style="{StaticResource GlassCheck}" VerticalAlignment="Center" ToolTip="启用规则" AutomationProperties.Name="启用规则"/>
+        <ComboBox Grid.Column="1" SelectedIndex="{Binding MatchIndex}" Margin="0,0,10,0"><ComboBoxItem Content="精确匹配"/><ComboBoxItem Content="正则匹配"/></ComboBox>
+        <TextBox Grid.Column="2" Text="{Binding Pattern,UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource AppleTextBox}" AutomationProperties.Name="匹配内容"/>
+        <Button Grid.Column="3" Content="删除" Command="{Binding DataContext.RemoveDanmakuRuleCommand,RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" Style="{StaticResource AppleSecondaryButton}" Margin="10,0,0,0"/>
+        <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Error}" Foreground="#CE4B50" FontSize="12" Margin="0,4,0,0" Visibility="{Binding Error,Converter={StaticResource BoolToVis}}"/>
+       </Grid>
+      </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+     </StackPanel></Border>
+    </StackPanel>
+    <StackPanel x:Name="LaunchSection" Tag="Launch" Margin="0,0,0,24">
+     <TextBlock Text="启动" Style="{StaticResource SettingsSectionTitle}" />
+     <Border Style="{StaticResource AppleCard}"><StackPanel>
+      <DockPanel Margin="0,0,0,18"><CheckBox DockPanel.Dock="Right" IsChecked="{Binding SmartMemory,Mode=TwoWay}" Style="{StaticResource GlassSwitch}" AutomationProperties.Name="智能内存" VerticalAlignment="Center"/><TextBlock Text="智能内存" Style="{StaticResource SettingsRowLabel}"/></DockPanel>
+      <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="300"/></Grid.ColumnDefinitions>
+      <TextBlock Text="分配内存" Style="{StaticResource SettingsRowLabel}"/>
+      <StackPanel Grid.Column="1"><TextBlock Text="{Binding MemoryLabel}" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right" Margin="0,0,0,8"/>
+       <Slider Minimum="0" Maximum="{Binding AvailableMemoryMb}" SmallChange="256" LargeChange="1024" TickFrequency="256" IsSnapToTickEnabled="True" Value="{Binding MemoryMb,Mode=TwoWay}" AutomationProperties.Name="分配内存"/>
+       <TextBlock Text="{Binding AvailableMemoryLabel}" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right" Margin="0,8,0,0"/>
+       <TextBlock Text="{Binding MemoryStatus}" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Right"/>
+      </StackPanel>
+     </Grid></StackPanel></Border>
+    </StackPanel>
+    <StackPanel x:Name="JavaSection" Tag="Java" Margin="0,0,0,24">
+     <DockPanel Margin="0,0,0,10">
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><Button Content="添加" Command="{Binding SelectManualJavaCommand}" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,8,0"/><Button Content="扫描" Command="{Binding ScanJavaCommand}" IsEnabled="{Binding IsScanningJava,Converter={StaticResource BoolToVis},ConverterParameter=Inverse}" Style="{StaticResource AppleSecondaryButton}"/></StackPanel>
+      <TextBlock Text="Java" Style="{StaticResource SettingsSectionTitle}" Margin="0" VerticalAlignment="Center"/>
+     </DockPanel>
+     <Border Style="{StaticResource AppleCard}"><StackPanel>
+      <Grid Margin="0,0,0,18"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <TextBlock Text="下载目录" Style="{StaticResource SettingsRowLabel}"/>
+       <TextBlock Grid.Column="1" Text="{Binding JavaDownloadDirectory}" ToolTip="{Binding JavaDownloadDirectory}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+       <StackPanel Grid.Column="2" Orientation="Horizontal"><Button Content="选择" Command="{Binding BrowseJavaDownloadDirectoryCommand}" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,8,0"/><Button Content="重置" Command="{Binding ResetJavaDownloadDirectoryCommand}" Style="{StaticResource AppleSecondaryButton}"/></StackPanel>
+      </Grid>
+      <DockPanel Margin="0,0,0,12">
+       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" IsEnabled="{Binding IsDownloadingJava,Converter={StaticResource BoolToVis},ConverterParameter=Inverse}">
+        <Button Content="8" Command="{Binding DownloadAdoptiumJavaCommand}" CommandParameter="8" Style="{StaticResource AppleSecondaryButton}" MinWidth="48" Margin="0,0,6,0"/>
+        <Button Content="17" Command="{Binding DownloadAdoptiumJavaCommand}" CommandParameter="17" Style="{StaticResource AppleSecondaryButton}" MinWidth="48" Margin="0,0,6,0"/>
+        <Button Content="21" Command="{Binding DownloadAdoptiumJavaCommand}" CommandParameter="21" Style="{StaticResource AppleSecondaryButton}" MinWidth="48" Margin="0,0,6,0"/>
+        <Button Content="25" Command="{Binding DownloadAdoptiumJavaCommand}" CommandParameter="25" Style="{StaticResource AppleSecondaryButton}" MinWidth="48"/>
+       </StackPanel>
+       <TextBlock Text="下载 Java" Style="{StaticResource SettingsRowLabel}"/>
+      </DockPanel>
+      <StackPanel Visibility="{Binding JavaDownloadStatus,Converter={StaticResource BoolToVis}}" Margin="0,0,0,12">
+       <DockPanel Margin="0,0,0,10">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+         <Button Content="取消" Command="{Binding CancelJavaDownloadCommand}" IsEnabled="{Binding IsCancellingDownload,Converter={StaticResource BoolToVis},ConverterParameter=Inverse}" Visibility="{Binding IsDownloadingJava,Converter={StaticResource BoolToVis}}" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,8,0"/>
+         <Button Content="详细信息" Command="{Binding ToggleDownloadDetailsCommand}" Style="{StaticResource AppleSecondaryButton}"/>
+        </StackPanel>
+        <StackPanel VerticalAlignment="Center"><TextBlock Text="{Binding JavaDownloadStatus}" Foreground="{DynamicResource TextPrimaryBrush}"/><TextBlock Text="{Binding DownloadSpeed}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,3,0,0"/></StackPanel>
+       </DockPanel>
+       <ProgressBar Style="{StaticResource AppleProgressBar}" Value="{Binding JavaDownloadProgress,Mode=OneWay}" Maximum="100" IsIndeterminate="{Binding DownloadIndeterminate}"/>
+      </StackPanel>
+      <ItemsControl ItemsSource="{Binding InstalledJavas}"><ItemsControl.ItemTemplate><DataTemplate>
+       <Border Padding="0,12" BorderBrush="{DynamicResource AppleCardBorderBrush}" BorderThickness="0,1,0,0"><Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <StackPanel Margin="0,0,16,0"><TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Medium"/><TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,0"/></StackPanel>
+        <Button Grid.Column="1" Content="选用" Click="SelectJava_Click" Tag="{Binding}" Style="{StaticResource AppleSecondaryButton}" VerticalAlignment="Center"/>
+       </Grid></Border>
+      </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+     </StackPanel></Border>
+    </StackPanel>
+    <StackPanel x:Name="DownloadsSection" Tag="Downloads" Margin="0,0,0,24">
+     <TextBlock Text="下载" Style="{StaticResource SettingsSectionTitle}"/>
+     <Border Style="{StaticResource AppleCard}"><StackPanel>
+      <DockPanel Margin="0,0,0,18"><CheckBox DockPanel.Dock="Right" IsChecked="{Binding PreferGameMirror}" Style="{StaticResource GlassSwitch}" VerticalAlignment="Center"/><TextBlock Text="游戏镜像 · BMCLAPI" Style="{StaticResource SettingsRowLabel}"/></DockPanel>
+      <DockPanel Margin="0,0,0,18"><CheckBox DockPanel.Dock="Right" IsChecked="{Binding PreferContentMirror}" Style="{StaticResource GlassSwitch}" VerticalAlignment="Center"/><TextBlock Text="内容镜像 · MCIM" Style="{StaticResource SettingsRowLabel}"/></DockPanel>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <TextBlock Text="CurseForge Key" Style="{StaticResource SettingsRowLabel}"/>
+       <PasswordBox x:Name="CurseForgeKeyBox" Grid.Column="1" Style="{StaticResource ApplePasswordBox}" PasswordChanged="CurseForgeKeyChanged" Margin="0,0,10,0"/>
+       <StackPanel Grid.Column="2" Orientation="Horizontal"><Button Content="保存" Click="SaveCurseForgeKeyClick" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,8,0"/><Button Content="移除" Command="{Binding RemoveCurseForgeKeyCommand}" Style="{StaticResource AppleSecondaryButton}"/></StackPanel>
+      </Grid>
+      <TextBlock Text="{Binding CurseForgeKeyStatus}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" HorizontalAlignment="Right" Margin="0,8,0,0"/>
+     </StackPanel></Border>
+    </StackPanel>
+    <StackPanel x:Name="DataSection" Tag="Data" Margin="0,0,0,24">
+     <TextBlock Text="数据" Style="{StaticResource SettingsSectionTitle}"/>
+     <Border Style="{StaticResource AppleCard}"><StackPanel>
+      <Grid Margin="0,0,0,18"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <TextBlock Text="保存位置" Style="{StaticResource SettingsRowLabel}"/>
+       <TextBlock Grid.Column="1" Text="{Binding DataDirectory}" ToolTip="{Binding DataDirectory}" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,12,0"/>
+       <StackPanel Grid.Column="2" Orientation="Horizontal"><Button Content="选择" Command="{Binding ChangeDataDirectoryCommand}" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,8,0"/><Button Content="打开" Command="{Binding OpenDataFolderCommand}" Style="{StaticResource AppleSecondaryButton}"/></StackPanel>
+      </Grid>
+      <DockPanel><Button DockPanel.Dock="Right" Content="导入 settings.json" Command="{Binding ImportSettingsCommand}" Style="{StaticResource AppleSecondaryButton}"/><TextBlock Text="配置" Style="{StaticResource SettingsRowLabel}"/></DockPanel>
+      <TextBlock Text="{Binding DataStatus}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,12,0,0" Visibility="{Binding DataStatus,Converter={StaticResource BoolToVis}}"/>
+     </StackPanel></Border>
+    </StackPanel>
+    <StackPanel x:Name="AiSection" Tag="AI" Margin="0,0,0,24">
+     <TextBlock Text="AI" Style="{StaticResource SettingsSectionTitle}"/>
+     <Border Style="{StaticResource AppleCard}" DataContext="{Binding Main.AgentVM}"><StackPanel>
+      <Grid Margin="0,0,0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="DeepSeek API Key" Style="{StaticResource SettingsRowLabel}"/><StackPanel Grid.Column="1"><PasswordBox Style="{StaticResource ApplePasswordBox}" x:Name="SettingsAiKey" PasswordChanged="AiKeyChanged" IsEnabled="{Binding CanConfigure}" AutomationProperties.Name="DeepSeek API Key"/><TextBlock Text="{Binding ConnectionStatus}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,8,0,0"/><WrapPanel Margin="0,10,0,0"><Button Content="保存并测试" Style="{StaticResource AppleSecondaryButton}" IsEnabled="{Binding CanConfigure}" Click="SaveAiKeyClick" Margin="0,0,8,0"/><Button Content="刷新模型" Style="{StaticResource AppleSecondaryButton}" Command="{Binding RefreshModelsCommand}" IsEnabled="{Binding CanConfigure}" Margin="0,0,8,0"/><Button Content="移除" Style="{StaticResource AppleSecondaryButton}" Command="{Binding RemoveKeyCommand}" IsEnabled="{Binding CanConfigure}"/></WrapPanel></StackPanel></Grid>
+      <Grid Margin="0,0,0,14"><Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="模型" Style="{StaticResource SettingsRowLabel}"/><ComboBox Grid.Column="1" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}" DisplayMemberPath="Name" IsEnabled="{Binding CanConfigure}"/></Grid>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="推理" Style="{StaticResource SettingsRowLabel}"/><ComboBox Grid.Column="1" ItemsSource="{Binding ReasoningLevels}" SelectedItem="{Binding ReasoningEffort}" IsEnabled="{Binding CanConfigure}"/></Grid>
+     </StackPanel></Border>
+    </StackPanel>
+    <StackPanel x:Name="AdvancedSection" Tag="Advanced">
+     <TextBlock Text="高级" Style="{StaticResource SettingsSectionTitle}"/>
+     <Border Style="{StaticResource AppleCard}"><StackPanel>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition/></Grid.ColumnDefinitions>
+       <TextBlock Text="微软 Client ID" Style="{StaticResource SettingsRowLabel}"/>
+       <TextBox Grid.Column="1" Style="{StaticResource AppleTextBox}" Text="{Binding MicrosoftClientId,UpdateSourceTrigger=PropertyChanged}"/>
+      </Grid>
+     </StackPanel></Border>
+    </StackPanel>
+   </StackPanel>
+  </ScrollViewer>
+  <Border x:Name="DownloadOverlay" Background="#65000000" Focusable="True" KeyboardNavigation.TabNavigation="Cycle" IsVisibleChanged="DownloadOverlayVisibleChanged" Visibility="{Binding ShowDownloadDetails,Converter={StaticResource BoolToVis}}" motion:RevealMotion.Enabled="True">
+   <Border Style="{StaticResource AppleCard}" Background="{DynamicResource PopupBrush}" Width="500" MaxHeight="490" Padding="24" VerticalAlignment="Center" Margin="24">
+    <StackPanel>
+     <DockPanel Margin="0,0,0,18"><Button DockPanel.Dock="Right" Content="完成" Command="{Binding ToggleDownloadDetailsCommand}" Style="{StaticResource AppleSecondaryButton}"/><TextBlock Text="下载详情" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/></DockPanel>
+     <TextBlock Text="{Binding JavaDownloadStatus}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+     <ItemsControl ItemsSource="{Binding DownloadConnections}"><ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,0,0,16">
+      <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Medium"/>
+      <ProgressBar Style="{StaticResource AppleProgressBar}" Value="{Binding Percent,Mode=OneWay}" Maximum="100" Margin="0,8,0,6"/>
+      <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
+     </StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+     <TextBlock Text="{Binding DownloadError}" Foreground="#FF5F56" TextWrapping="Wrap" MaxHeight="100"/>
+    </StackPanel>
+   </Border>
+  </Border>
+ </Grid>
+</UserControl>
+
+
