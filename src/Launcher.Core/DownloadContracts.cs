@@ -22,7 +22,7 @@ public interface IInstallationVerifier
 {
     Task<InstallationCheck> VerifyAsync(MinecraftLauncher launcher, string version, IProgress<InstallationCheck> progress, CancellationToken token);
 }
-public sealed record GameInstallRequest(InstallPlan Plan, string Staging, JavaRuntimeInfo Java, string? ReadOnlyCache, string DataDirectory, string? DownloadCacheRoot = null);
+public sealed record GameInstallRequest(InstallPlan Plan, string Staging, JavaRuntimeInfo? Java, string? ReadOnlyCache, string DataDirectory, string? DownloadCacheRoot = null);
 public interface IGameInstallEngine
 {
     Task<string> InstallAsync(GameInstallRequest request, Action<DownloadTaskState, string, FileDownloadProgress?> update, CancellationToken token);

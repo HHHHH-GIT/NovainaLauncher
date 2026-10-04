@@ -14,6 +14,20 @@ namespace Launcher.Tests;
 
 public sealed class AgentModeTests
 {
+    [Fact] public async Task Tool_Lifecycle_Keeps_Stable_Ids_Progress_And_Readable_Results()
+    {
+        var ops = new Ops { ReportProgress = true, Result = _ => ToolResult.Ok("读取完成", new { name = "中文游戏", minecraft = "1.20.1", loader = "Forge", access_token = "never-display" }) };
+        var fake = new FakeClient([DeepSeekClient.ParseCompleted(Complete(Call("get_launcher_state", "{}", "a"), Call("get_tasks", "{}", "b"))), DeepSeekClient.ParseCompleted(Complete())]);
+        var events = new List<AgentUiEvent>();
+        var session = new AgentSessionService(fake, new AgentToolRegistry(ops), ops, new Interaction()); session.Event += events.Add;
+        await session.SendAsync("查询", new("fixture", "fixture"), "high");
+        var starts = events.Where(e => e.Kind == AgentUiEventKind.ToolStarted).ToArray();
+        var finished = events.Where(e => e.Kind == AgentUiEventKind.ToolCompleted).ToArray();
+        Assert.Equal(2, starts.Length); Assert.Equal(starts.Select(e => e.ToolCallId), finished.Select(e => e.ToolCallId));
+        Assert.All(finished, e => { Assert.Equal(AgentToolState.Completed, e.ToolState); Assert.Contains("Minecraft：1.20.1", e.Detail); Assert.DoesNotContain("never-display", e.Detail); });
+        Assert.All(events.Where(e => e.Kind == AgentUiEventKind.Operation), e => Assert.Contains(starts, s => s.ToolCallId == e.ToolCallId));
+        await session.SendAsync("再查一次", new("fixture", "fixture"), "high");
+    }
     [Fact] public async Task Login_Retry_Uses_Logical_Account_Id_And_Rejects_Password_Arguments()
     {
         var ops = new Ops(); var registry = new AgentToolRegistry(ops);
@@ -66,6 +80,17 @@ public sealed class AgentModeTests
         var client = new DeepSeekClient(() => "fixture", sdkOptions: new ResponsesClientOptions { Endpoint = new("https://api.deepseek.com"), Transport = new HttpClientPipelineTransport(http), RetryPolicy = new ClientRetryPolicy(0) });
         await Assert.ThrowsAsync<InvalidDataException>(() => client.RespondAsync(new("deepseek-flash", "Flash"), "high", [], [], _ => { }, default));
     }
+    [Fact] public async Task Sdk_Compaction_Is_Stateless_And_Disables_Tools()
+    {
+        string? body = null;
+        var final = Complete(new JsonObject { ["type"] = "message", ["id"] = "summary", ["role"] = "assistant", ["status"] = "completed", ["content"] = new JsonArray(new JsonObject { ["type"] = "output_text", ["text"] = "用户选择探索，已安装真实游戏 local-123，下一步核实启动状态。", ["annotations"] = new JsonArray() }) });
+        using var http = new HttpClient(new Handler(async request => { body = await request.Content!.ReadAsStringAsync(); return Sse("response.output_text.delta", "{\"type\":\"response.output_text.delta\",\"sequence_number\":1,\"delta\":\"摘要\"}", final); }));
+        var client = new DeepSeekClient(() => "fixture", sdkOptions: new ResponsesClientOptions { Endpoint = new("https://api.deepseek.com"), Transport = new HttpClientPipelineTransport(http), RetryPolicy = new ClientRetryPolicy(0) });
+        var result = await client.CompactAsync(new("fixture", "Fixture"), "high", [new JsonObject { ["role"] = "user", ["content"] = "目标" }], default);
+        Assert.Contains("local-123", result.Summary);
+        var sent = JsonNode.Parse(body!)!; Assert.Equal("none", sent["tool_choice"]!.ToString()); Assert.Empty(sent["tools"]!.AsArray());
+        Assert.Equal(AgentPrompt.Compaction, sent["instructions"]!.ToString()); Assert.Null(sent["previous_response_id"]); Assert.False(sent["store"]!.GetValue<bool>());
+    }
     [Fact] public void Partial_Response_And_Malformed_Tool_Arguments_Are_Rejected()
     {
         var final = Complete(Call("install_game", "{")); Assert.ThrowsAny<Exception>(() => DeepSeekClient.ParseCompleted(final));
@@ -107,8 +132,10 @@ public sealed class AgentModeTests
         var ops = new Ops(); var interaction = new Interaction { Approval = new(TaskCreationOptions.RunContinuationsAsynchronously) };
         var fake = new FakeClient([DeepSeekClient.ParseCompleted(Complete(Call("delete_game", "{\"game_id\":\"actual\"}")))]);
         var session = new AgentSessionService(fake, new AgentToolRegistry(ops), ops, interaction);
+        var events = new List<AgentUiEvent>(); session.Event += events.Add;
         var run = session.SendAsync("删除", new("fixture", "fixture"), "high"); Assert.False(run.IsCompleted);
         await session.StopAsync(); Assert.False(session.IsRunning); Assert.Empty(ops.Calls); Assert.Single(ops.Cancelled);
+        Assert.Contains(events, e => e.Kind == AgentUiEventKind.ToolCompleted && e.ToolState == AgentToolState.Cancelled);
         await session.SendAsync("继续", new("fixture", "fixture"), "high");
         Assert.Contains(fake.Histories[^1].OfType<JsonObject>(), x => x["type"]?.GetValue<string>() == "function_call_output" && JsonNode.Parse(x["output"]!.GetValue<string>())!["Summary"]!.GetValue<string>().Contains("中止"));
         Assert.NotEqual(ops.Cancelled[0], ops.Cancelled[1]);
@@ -140,8 +167,9 @@ public sealed class AgentModeTests
     private sealed class Ops : ILauncherOperations
     {
         public Func<string, ToolResult>? Result;
+        public bool ReportProgress;
         public List<string> Calls { get; } = []; public List<Guid> Cancelled { get; } = []; public string? Described;
-        public Task<ToolResult> ExecuteAsync(string name, JsonObject a, AgentExecutionContext c) { Calls.Add(name); return Task.FromResult(Result?.Invoke(name) ?? ToolResult.Ok("完成")); }
+        public Task<ToolResult> ExecuteAsync(string name, JsonObject a, AgentExecutionContext c) { Calls.Add(name); if (ReportProgress) c.Emit(new(AgentUiEventKind.Operation, "正在读取", "真实进度", "progress")); return Task.FromResult(Result?.Invoke(name) ?? ToolResult.Ok("完成")); }
         public Task<AgentApproval> DescribeSensitiveAsync(string n, JsonObject a, CancellationToken c) { Described = a["game_id"]!.GetValue<string>(); return Task.FromResult(new AgentApproval("删除", Described)); }
         public Task CancelGroupAsync(Guid g) { Cancelled.Add(g); return Task.CompletedTask; }
     }

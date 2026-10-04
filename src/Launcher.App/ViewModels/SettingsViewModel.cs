@@ -22,13 +22,14 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         if (DownloadAdoptiumJavaCommand.ExecutionTask is { } task) await task;
     }
     public void Dispose() { _memoryLifetime.Cancel(); _downloadCts?.Cancel(); if (_saveTimer.IsEnabled) { _saveTimer.Stop(); Main.SettingsStore.Save(Main.Settings); } }
-    public static IReadOnlyList<SettingsSection> Sections { get; } = [new("Appearance", "外观与动画"), new("Danmaku", "弹幕"), new("Launch", "启动"), new("Java", "Java"), new("Downloads", "下载"), new("Data", "数据"), new("AI", "AI"), new("Advanced", "高级")];
+    public static IReadOnlyList<SettingsSection> Sections { get; } = [new("Appearance", "外观与动画"), new("Danmaku", "弹幕"), new("LaunchJava", "启动与Java"), new("DownloadsData", "下载与数据"), new("AI", "AI")];
     [ObservableProperty] private string _selectedSection = "Appearance";
     public double ScrollOffset { get; set; }
     public bool HasPendingSection { get; set; }
     public event Action? SectionRequested;
     [RelayCommand] public void NavigateSection(string id)
     {
+        id = id switch { "Launch" or "Java" => "LaunchJava", "Downloads" or "Data" => "DownloadsData", _ => id };
         if (!Sections.Any(x => x.Id == id)) return;
         Main.Navigate("Settings"); SelectedSection = id; HasPendingSection = true; SectionRequested?.Invoke();
     }
@@ -57,9 +58,6 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private int _memoryMb;
 
-    [ObservableProperty]
-    private string _microsoftClientId;
-
     [ObservableProperty] private string _theme = "System";
     public string ThemeLabel => Theme switch { "Dark" => "深色", "Light" => "浅色", _ => "跟随系统" };
     partial void OnThemeChanged(string value)
@@ -75,6 +73,13 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private bool _isScanningJava = false;
+
+    [ObservableProperty] private bool _autoPrepareJava = true;
+    partial void OnAutoPrepareJavaChanged(bool value)
+    {
+        Main.Settings.AutoPrepareJava = value;
+        ScheduleSave();
+    }
 
     [ObservableProperty]
     private bool _isDownloadingJava = false;
@@ -97,8 +102,8 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         _availableMemoryMb = Math.Max(256, _memoryMb);
         _smartMemory = main.Settings.MemoryAllocationMode != MemoryAllocationMode.Manual;
         _javaDownloadDirectory = string.IsNullOrWhiteSpace(main.Settings.JavaDownloadDirectory) ? AppPaths.Runtime : main.Settings.JavaDownloadDirectory;
+        _autoPrepareJava = main.Settings.AutoPrepareJava;
         _windowTransparencyPercent = Math.Clamp(main.Settings.WindowTransparencyPercent, 0, 50);
-        _microsoftClientId = main.Settings.MicrosoftClientId;
         _theme = main.Settings.Theme;
         _animationIndex = Enum.IsDefined(main.Settings.UiAnimationMode) ? (int)main.Settings.UiAnimationMode : 2;
         MotionPolicy.Set((UiAnimationMode)_animationIndex);
@@ -116,12 +121,6 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(MemoryLabel));
     }
 
-    partial void OnMicrosoftClientIdChanged(string value)
-    {
-        Main.Settings.MicrosoftClientId = value.Trim();
-        ScheduleSave();
-    }
-
     [RelayCommand]
     public async Task ScanJavaAsync()
     {
@@ -131,8 +130,10 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         try
         {
             Main.Log.Write("正在扫描本地 Java 运行时...", LogLevel.Info, true);
-            var overrides = Main.Settings.JavaOverrides.Values;
-            var list = await Main.Java.ScanAsync(Main.Settings.GameRoot, overrides, downloadDirectory: JavaDownloadDirectory);
+            var overrides = Main.Settings.JavaOverrides.Values.ToArray();
+            var root = Main.Settings.GameRoot;
+            var downloadDirectory = JavaDownloadDirectory;
+            var list = await Task.Run(() => Main.Java.ScanAsync(root, overrides, downloadDirectory: downloadDirectory));
 
             InstalledJavas.Clear();
             foreach (var j in list)

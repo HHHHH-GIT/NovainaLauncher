@@ -34,6 +34,7 @@ public sealed record SourcePolicy(bool GameMirror, bool ContentMirror, string? C
 public sealed record InstallPlan(string Name, string Root, GameCatalogVersion? Game, LoaderCatalogVersion? Loader, OptiFineCatalogVersion? OptiFine, VersionInfo? Target, string? TargetDirectory, ContentRelease? Content, SourcePolicy Sources, string JavaDirectory, IReadOnlyList<JavaRuntimeInfo> Javas, int? TargetJavaMajor = null, IReadOnlyList<ContentRelease>? DependencyVersions = null, string? LocalArchive = null)
 {
     public string Directory => TargetDirectory ?? System.IO.Path.Combine(Root, "versions", Name);
+    public bool AutoPrepareJava { get; init; } = true;
 }
 public sealed record FileDownloadProgress(long DownloadedBytes, long? TotalBytes, double BytesPerSecond, IReadOnlyList<DownloadConnectionProgress> Connections)
 {

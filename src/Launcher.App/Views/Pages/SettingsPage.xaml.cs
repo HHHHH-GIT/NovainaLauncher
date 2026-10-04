@@ -79,7 +79,7 @@ public partial class SettingsPage : UserControl
         if (_jumpSection is not null && Math.Abs(SettingsScroll.VerticalOffset - _to) < 1) { _vm.SelectedSection = _jumpSection; return; }
         _jumpSection = null;
         var selected = Anchors.LastOrDefault(x => x.TranslatePoint(new Point(), SettingsScroll).Y <= 64) ?? AppearanceSection;
-        if (SettingsScroll.ScrollableHeight > 0 && SettingsScroll.VerticalOffset >= SettingsScroll.ScrollableHeight - 1) selected = AdvancedSection;
+        if (SettingsScroll.ScrollableHeight > 0 && SettingsScroll.VerticalOffset >= SettingsScroll.ScrollableHeight - 1) selected = Anchors.Last();
         _vm.SelectedSection = (string)selected.Tag;
     }
     private void SelectJava_Click(object sender, RoutedEventArgs e)

@@ -50,8 +50,7 @@ public sealed partial class DownloadInstallService(JavaService java, VersionServ
         overall?.Complete("准备 Java");
         // Modern Forge processors need a runtime able to run this game. Old Forge requires Java 8.
         update(DownloadTaskState.Java, "准备 Java " + javaMajor, null);
-        var runtime = JavaService.Select(plan.Javas, javaMajor, null);
-        runtime ??= await java.DownloadAsync(javaMajor.Value, new InlineProgress<JavaDownloadProgress>(p => { if (p.Stage == JavaDownloadStage.Downloading) progress.Report(new(p.DownloadedBytes, p.TotalBytes, p.BytesPerSecond, p.Connections)); else update(DownloadTaskState.Java, "准备 Java " + javaMajor, null); }), token, plan.JavaDirectory);
+        var runtime = await java.PrepareForInstallAsync(javaMajor.Value, plan, new InlineProgress<JavaDownloadProgress>(p => { if (p.Stage == JavaDownloadStage.Downloading) progress.Report(new(p.DownloadedBytes, p.TotalBytes, p.BytesPerSecond, p.Connections)); else update(DownloadTaskState.Java, "准备 Java " + javaMajor, null); }), token, cacheWriteRoot ?? plan.Root);
         overall?.Complete("安装与校验游戏");
         var engine = gameEngine ?? (HostedGameInstallEngine.IsConfigured ? new HostedGameInstallEngine() : new NativeGameInstallEngine());
         var cacheRoot = sharedCache ?? readOnlyCache;

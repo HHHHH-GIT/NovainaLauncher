@@ -15,6 +15,32 @@ $variants = @(
     @{Profile='SingleFileLite'; Contained='false'; Name="NovainaLauncher-$version-win-x64-lite.exe"; Folder='lite'}
 )
 
+function Copy-PublishedExecutable([string]$source, [string]$target) {
+    try {
+        [IO.File]::Copy($source, $target, $true)
+    }
+    catch [IO.IOException] {
+        # A running image can be renamed without stopping the user's launcher or game.
+        $errorCode = $_.Exception.HResult -band 0xffff
+        if ($errorCode -notin @(32, 33) -or -not [IO.File]::Exists($target)) { throw }
+        $target = [IO.Path]::GetFullPath($target)
+        $backupRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'artifacts/running-builds'))
+        $backup = [IO.Path]::GetFullPath((Join-Path $backupRoot ([IO.Path]::GetFileName($target) + '.' + [Guid]::NewGuid().ToString('N') + '.old')))
+        if ([IO.Path]::GetDirectoryName($target) -ne $bin -or
+            -not $backup.StartsWith($projectRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
+            [IO.Path]::GetDirectoryName($backup) -ne $backupRoot) { throw '发布轮换路径越界' }
+        [IO.Directory]::CreateDirectory($backupRoot) | Out-Null
+        Move-Item -LiteralPath $target -Destination $backup
+        try { [IO.File]::Copy($source, $target, $false) }
+        catch {
+            if (-not [IO.File]::Exists($target)) { Move-Item -LiteralPath $backup -Destination $target }
+            throw
+        }
+        try { Remove-Item -LiteralPath $backup -ErrorAction Stop }
+        catch [IO.IOException] { Write-Warning "运行中的旧文件暂存于 $backup；新版本重启后生效。" }
+    }
+}
+
 Push-Location $projectRoot
 try {
     if (-not $SkipBuild) {
@@ -27,7 +53,7 @@ try {
             if ($files.Count -ne 1 -or $files[0].Name -ne 'NovainaLauncher.exe') { throw "单文件发布包含额外文件：$output" }
         }
         foreach ($variant in $variants) {
-            Copy-Item -LiteralPath (Join-Path $temporary ($variant.Folder + '/NovainaLauncher.exe')) -Destination (Join-Path $bin $variant.Name) -Force
+            Copy-PublishedExecutable (Join-Path $temporary ($variant.Folder + '/NovainaLauncher.exe')) (Join-Path $bin $variant.Name)
         }
     }
     $python = Get-Command py -ErrorAction SilentlyContinue

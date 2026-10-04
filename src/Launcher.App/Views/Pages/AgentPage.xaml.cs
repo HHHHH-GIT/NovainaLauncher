@@ -20,6 +20,8 @@ public partial class AgentPage : UserControl
     private bool _timelineUpdatePending;
     private double _scrollTarget;
     private object? _lastTimelineItem;
+    private bool _contextPinned;
+    private Window? _hostWindow;
     private ScrollViewer? TimelineScroll => TimelineList.Template?.FindName("PART_ScrollViewer", TimelineList) as ScrollViewer;
     private static readonly DependencyProperty TimelineOffsetProperty = DependencyProperty.Register(
         "TimelineOffset", typeof(double), typeof(AgentPage), new PropertyMetadata(0d, (d, e) =>
@@ -30,9 +32,21 @@ public partial class AgentPage : UserControl
         TextCompositionManager.AddPreviewTextInputStartHandler(Composer, ComposerCompositionStarted);
         TextCompositionManager.AddPreviewTextInputUpdateHandler(Composer, ComposerCompositionStarted);
         Composer.AddHandler(TextCompositionManager.TextInputEvent, new TextCompositionEventHandler(ComposerCompositionCompleted), true);
-        Loaded += (_, _) => { MotionPolicy.Changed += MotionChanged; _vm = DataContext as AgentViewModel; if (_vm is not null) _vm.TimelineChanged += TimelineChanged; UpdatePlaceholder(); };
-        Unloaded += (_, _) => { MotionPolicy.Changed -= MotionChanged; if (_vm is not null) _vm.TimelineChanged -= TimelineChanged; _vm = null; FinishIntro(); StopTimelineScroll(); };
-        IsVisibleChanged += (_, _) => { if (IsVisible) PlayIntro(); else { FinishIntro(); StopTimelineScroll(); } };
+        Composer.SelectionChanged += (_, _) => RefreshSuggestions();
+        Loaded += (_, _) =>
+        {
+            MotionPolicy.Changed += MotionChanged; _vm = DataContext as AgentViewModel;
+            if (_vm is not null) { _vm.TimelineChanged += TimelineChanged; _vm.FocusComposerRequested += FocusComposer; _vm.PropertyChanged += ViewModelChanged; }
+            _hostWindow = Window.GetWindow(this); if (_hostWindow is not null) _hostWindow.StateChanged += HostStateChanged;
+            UpdatePlaceholder();
+        };
+        Unloaded += (_, _) =>
+        {
+            MotionPolicy.Changed -= MotionChanged; CloseFloatingPanels();
+            if (_vm is not null) { _vm.TimelineChanged -= TimelineChanged; _vm.FocusComposerRequested -= FocusComposer; _vm.PropertyChanged -= ViewModelChanged; }
+            if (_hostWindow is not null) _hostWindow.StateChanged -= HostStateChanged; _hostWindow = null; _vm = null; FinishIntro(); StopTimelineScroll();
+        };
+        IsVisibleChanged += (_, _) => { if (IsVisible) PlayIntro(); else { CloseFloatingPanels(); FinishIntro(); StopTimelineScroll(); } };
     }
     private void TimelineChanged()
     {
@@ -89,12 +103,12 @@ public partial class AgentPage : UserControl
     }
     private void TimelineMouseDown(object sender, MouseButtonEventArgs e) => StopTimelineScroll();
     private void MotionChanged() { FinishIntro(); StopTimelineScroll(); }
-    private void ComposerCompositionStarted(object sender, TextCompositionEventArgs e) { _isComposing = true; UpdatePlaceholder(); }
+    private void ComposerCompositionStarted(object sender, TextCompositionEventArgs e) { _isComposing = true; if (_vm is not null) _vm.ShowSuggestions = false; UpdatePlaceholder(); }
     private void ComposerCompositionCompleted(object sender, TextCompositionEventArgs e)
     {
-        Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => { _isComposing = false; UpdatePlaceholder(); }));
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => { _isComposing = false; UpdatePlaceholder(); RefreshSuggestions(); }));
     }
-    private void ComposerTextChanged(object sender, TextChangedEventArgs e) => UpdatePlaceholder();
+    private void ComposerTextChanged(object sender, TextChangedEventArgs e) { UpdatePlaceholder(); RefreshSuggestions(); }
     private void ComposerLostFocus(object sender, KeyboardFocusChangedEventArgs e) { _isComposing = false; UpdatePlaceholder(); }
     private void UpdatePlaceholder()
     {
@@ -104,17 +118,54 @@ public partial class AgentPage : UserControl
     private void ApiKeyChanged(object sender, RoutedEventArgs e) { if (DataContext is AgentViewModel vm) vm.PendingKey = ((PasswordBox)sender).Password; }
     private async void ConnectClick(object sender, RoutedEventArgs e)
     { if (DataContext is AgentViewModel vm) { await vm.ConnectCommand.ExecuteAsync(null); ApiKeyBox.Clear(); } }
-    private void ComposerKeyDown(object sender, KeyEventArgs e)
+    private async void ComposerKeyDown(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.ImeProcessed ? e.ImeProcessedKey : e.Key;
         if (_isComposing)
         {
             if (key == Key.Escape)
-                Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => { _isComposing = false; UpdatePlaceholder(); }));
+                _ = Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => { _isComposing = false; UpdatePlaceholder(); }));
             return; // Enter first commits the IME candidate; it must not send the message.
         }
-        if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None && DataContext is AgentViewModel vm)
-        { e.Handled = true; if (vm.CanSend) vm.SendCommand.Execute(null); }
+        if (DataContext is not AgentViewModel vm || Keyboard.Modifiers != ModifierKeys.None) return;
+        if (vm.ShowSuggestions)
+        {
+            if (e.Key is Key.Up or Key.Down)
+            {
+                e.Handled = true; var index = vm.SelectedSuggestion is null ? 0 : vm.Suggestions.IndexOf(vm.SelectedSuggestion);
+                vm.SelectedSuggestion = vm.Suggestions[Math.Clamp(index + (e.Key == Key.Up ? -1 : 1), 0, vm.Suggestions.Count - 1)]; SuggestionsList.ScrollIntoView(vm.SelectedSuggestion); return;
+            }
+            if (e.Key is Key.Enter or Key.Tab && vm.SelectedSuggestion is { } selected) { e.Handled = true; await vm.AcceptSuggestionAsync(selected); return; }
+            if (e.Key == Key.Escape) { e.Handled = true; vm.ShowSuggestions = false; return; }
+        }
+        if (e.Key == Key.Enter) { e.Handled = true; if (await vm.TryExecuteLocalInputAsync()) return; if (vm.CanSend) await vm.SendCommand.ExecuteAsync(null); }
+    }
+    private void RefreshSuggestions()
+    { if (!_isComposing && Composer is { IsKeyboardFocusWithin: true } && DataContext is AgentViewModel vm) vm.UpdateSuggestions(Composer.CaretIndex); }
+    private void FocusComposer(int caret) { Composer.Focus(); Composer.CaretIndex = Math.Clamp(caret, 0, Composer.Text.Length); if (_vm is not null) _vm.ShowSuggestions = false; }
+    private async void SuggestionClicked(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(SuggestionsList, source) is ListBoxItem { DataContext: AgentComposerSuggestion suggestion } && DataContext is AgentViewModel vm)
+        { e.Handled = true; await vm.AcceptSuggestionAsync(suggestion); Composer.Focus(); }
+    }
+    private void SurfaceMouseDown(object sender, MouseButtonEventArgs e)
+    { if (e.OriginalSource is DependencyObject source && !IsInside(source, ComposerSurface) && _vm is not null) _vm.ShowSuggestions = false; }
+    private static bool IsInside(DependencyObject source, DependencyObject ancestor)
+    {
+        for (var current = source; current is not null; current = current is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(current) : LogicalTreeHelper.GetParent(current))
+            if (ReferenceEquals(current, ancestor)) return true;
+        return false;
+    }
+    private void ContextRingEntered(object sender, MouseEventArgs e) => ContextPopup.IsOpen = true;
+    private void ContextRingLeft(object sender, MouseEventArgs e) { if (!_contextPinned) ContextPopup.IsOpen = false; }
+    private void ContextRingClicked(object sender, RoutedEventArgs e) { _contextPinned = true; ContextPopup.IsOpen = true; }
+    private void ContextPopupClosed(object sender, RoutedEventArgs e) { _contextPinned = false; ContextPopup.IsOpen = false; }
+    private void CloseFloatingPanels() { _contextPinned = false; if (ContextPopup is not null) ContextPopup.IsOpen = false; if (_vm is not null) _vm.ShowSuggestions = false; }
+    private void HostStateChanged(object? sender, EventArgs e) { if (_hostWindow?.WindowState == WindowState.Minimized) CloseFloatingPanels(); }
+    private void ViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AgentViewModel.ShowWelcome) && _vm?.ShowWelcome == true) CloseFloatingPanels();
+        if (e.PropertyName == nameof(AgentViewModel.ShowGoalEditor) && _vm?.ShowGoalEditor == true) { CloseFloatingPanels(); Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => GoalInput.Focus())); }
     }
     private void FinishIntro()
     {

@@ -15,9 +15,22 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
     private CancellationTokenSource? _connection;
     private Task? _connectionTask;
     private Task? _stopTask;
+    private readonly Dictionary<string, AgentTimelineItem> _toolItems = new();
     public string PendingKey { private get; set; } = "";
     public ObservableCollection<AgentTimelineItem> Timeline { get; } = new();
     public ObservableCollection<AgentModel> Models { get; } = new();
+    public ObservableCollection<AgentComposerSuggestion> Suggestions { get; } = new();
+    public ObservableCollection<AgentComposerReference> DraftReferences { get; } = new();
+    [ObservableProperty] private AgentComposerSuggestion? _selectedSuggestion;
+    [ObservableProperty] private AgentContextUsage _contextUsage = new(0, 131072, []);
+    [ObservableProperty] private bool _showSuggestions;
+    [ObservableProperty] private bool _showGoalEditor;
+    [ObservableProperty] private string _goalDraft = "";
+    [ObservableProperty] private string _sessionGoal = "";
+    private AgentComposerToken? _composerToken;
+    public bool HasGoal => SessionGoal.Length > 0;
+    public bool HasDraftReferences => DraftReferences.Count > 0;
+    public event Action<int>? FocusComposerRequested;
     [ObservableProperty] private AgentModel? _selectedModel;
     [ObservableProperty] private string _input = "";
     [ObservableProperty] private string _status = "就绪";
@@ -42,17 +55,21 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
         _client = new DeepSeekClient(() => _key);
         _session = new AgentSessionService(new ClientProxy(this), new AgentToolRegistry(main.Operations), main.Operations, this);
         _session.Event += e => main.UiDispatcher.InvokeAsync(() => Receive(e));
-        if (main.Settings.AiModelId.Length > 0) { var saved = new AgentModel(main.Settings.AiModelId, main.Settings.AiModelId); Models.Add(saved); _selectedModel = saved; }
+        if (main.Settings.AiModelId.Length > 0) { var saved = new AgentModel(main.Settings.AiModelId, main.Settings.AiModelId) { HasVerifiedContextWindow = false }; Models.Add(saved); _selectedModel = saved; _session.SetModel(saved); }
+        ContextUsage = _session.ContextUsage;
+        DraftReferences.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasDraftReferences));
     }
     private sealed class ClientProxy(AgentViewModel vm) : IDeepSeekClient
     {
         public Task<IReadOnlyList<AgentModel>> GetModelsAsync(bool refresh, CancellationToken cancellation) => vm._client.GetModelsAsync(refresh, cancellation);
         public Task<AgentResponse> RespondAsync(AgentModel m, string effort, System.Text.Json.Nodes.JsonArray h, System.Text.Json.Nodes.JsonArray t, Action<string> delta, CancellationToken c) => vm._client.RespondAsync(m, effort, h, t, delta, c);
+        public Task<AgentCompaction> CompactAsync(AgentModel m, string effort, System.Text.Json.Nodes.JsonArray h, CancellationToken c) => vm._client.CompactAsync(m, effort, h, c);
     }
     partial void OnSelectedModelChanged(AgentModel? value)
-    { if (value is null || IsRunning) return; Main.Settings.AiModelId = value.Id; Main.SettingsStore.Save(Main.Settings); OnPropertyChanged(nameof(ReasoningLevels)); if (!ReasoningLevels.Contains(ReasoningEffort)) ReasoningEffort = ReasoningLevels.Contains("high") ? "high" : ReasoningLevels[0]; Changed(); }
+    { if (value is null || IsRunning) return; _session.SetModel(value); Main.Settings.AiModelId = value.Id; Main.SettingsStore.Save(Main.Settings); OnPropertyChanged(nameof(ReasoningLevels)); if (!ReasoningLevels.Contains(ReasoningEffort)) ReasoningEffort = ReasoningLevels.Contains("high") ? "high" : ReasoningLevels[0]; Changed(); }
     partial void OnReasoningEffortChanged(string value) { Main.Settings.AiReasoningEffort = value; Main.SettingsStore.Save(Main.Settings); }
-    partial void OnInputChanged(string value) => Changed();
+    partial void OnInputChanged(string value) { foreach (var item in DraftReferences.Where(x => !value.Contains(x.Token, StringComparison.Ordinal)).ToArray()) DraftReferences.Remove(item); Changed(); }
+    partial void OnSessionGoalChanged(string value) => OnPropertyChanged(nameof(HasGoal));
     partial void OnIsConfiguredChanged(bool value) { OnPropertyChanged(nameof(ShowWelcome)); Changed(); }
     partial void OnShowConnectionChanged(bool value) => OnPropertyChanged(nameof(ShowWelcome));
     partial void OnIsRunningChanged(bool value) => Changed();
@@ -61,7 +78,7 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
     private void Changed() { OnPropertyChanged(nameof(CanConfigure)); OnPropertyChanged(nameof(CanSend)); SendCommand.NotifyCanExecuteChanged(); }
     public async Task ModeChangedAsync(bool enabled)
     {
-        if (!enabled) { await StopAsync(); Main.CompleteAccountLogin(); }
+        if (!enabled) { ShowSuggestions = false; ShowGoalEditor = false; await StopAsync(); Main.CompleteAccountLogin(); }
         else if (IsConfigured) { _connectionTask = RefreshModelsCoreAsync(false); await _connectionTask; }
     }
     [RelayCommand] private void OpenConnection() => ShowConnection = true;
@@ -103,11 +120,77 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
     { if (!CanConfigure) return; Main.Secrets.Delete("deepseek-api-key"); _key = null; PendingKey = ""; _client = new DeepSeekClient(() => _key); IsConfigured = false; Models.Clear(); SelectedModel = null; Main.Settings.AiSetupCompleted = false; Main.SettingsStore.Save(Main.Settings); ConnectionStatus = "未配置"; }
     [RelayCommand(CanExecute = nameof(CanSend))] private async Task SendAsync()
     {
-        if (!CanSend) return; var text = Input.Trim(); Input = ""; var model = SelectedModel!;
+        if (await TryExecuteLocalInputAsync()) return;
+        if (!CanSend) return;
+        var text = Input.Trim(); var references = DraftReferences.Select(x => x.Reference).ToArray();
+        var current = Main.Operations.GetReferences();
+        if (references.Any(r => !current.Any(x => x.Id == r.Id && x.Kind == r.Kind))) { Status = "引用已失效，请重新选择"; return; }
+        Input = ""; ShowSuggestions = false;
+        await RunMessageAsync(text, references);
+    }
+    private async Task RunMessageAsync(string text, IReadOnlyList<AgentReference>? references = null)
+    {
+        if (SelectedModel is not { } model || !CanConfigure || !IsConfigured) return;
         IsRunning = true;
-        try { await _session.SendAsync(text, model, Main.Settings.AiReasoningEffort); }
+        try { await _session.SendAsync(text, model, Main.Settings.AiReasoningEffort, references: references); }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException) { Status = e.Message; }
         finally { IsRunning = false; }
     }
+    public void UpdateSuggestions(int caret)
+    {
+        _composerToken = AgentComposerParser.AtCaret(Input, caret); Suggestions.Clear();
+        if (_composerToken is { Prefix: '/' } slash)
+        {
+            foreach (var command in new[] { new AgentComposerSuggestion("/compact", "压缩上下文，保留目标与关键状态", "◔", "compact"), new AgentComposerSuggestion("/goal", "设置本次会话持续目标", "◎", "goal") })
+                if (command.Title[1..].StartsWith(slash.Query, StringComparison.OrdinalIgnoreCase)) Suggestions.Add(command);
+        }
+        else if (_composerToken is { Prefix: '@' } mention)
+            foreach (var reference in Main.Operations.GetReferences().Where(x => AgentComposerParser.Matches(x, mention.Query)))
+                Suggestions.Add(new(reference.Name, reference.KindLabel + " · " + reference.Detail, reference.Kind switch { "game" => "◇", "java" => "⚙", _ => "○" }, Reference: reference));
+        SelectedSuggestion = Suggestions.FirstOrDefault(); ShowSuggestions = Suggestions.Count > 0;
+    }
+    public async Task AcceptSuggestionAsync(AgentComposerSuggestion suggestion)
+    {
+        ShowSuggestions = false;
+        if (suggestion.Reference is { } reference && _composerToken is { } token)
+        {
+            var label = $"@「{reference.KindLabel}：{reference.Name}」";
+            if (Main.Operations.GetReferences().Count(x => x.Kind == reference.Kind && x.Name == reference.Name) > 1) label = $"@「{reference.KindLabel}：{reference.Name} · {reference.Id[^6..]}」";
+            Input = Input.Remove(token.Start, token.Length).Insert(token.Start, label + " ");
+            if (!DraftReferences.Any(x => x.Reference.Id == reference.Id)) DraftReferences.Add(new(reference, label));
+            FocusComposerRequested?.Invoke(token.Start + label.Length + 1);
+        }
+        else if (suggestion.Command == "compact") { Input = ""; await CompactAsync(); }
+        else if (suggestion.Command == "goal") { Input = ""; OpenGoal(); }
+    }
+    public async Task<bool> TryExecuteLocalInputAsync()
+    {
+        var text = Input.Trim();
+        if (text.Equals("/compact", StringComparison.OrdinalIgnoreCase)) { Input = ""; ShowSuggestions = false; await CompactAsync(); return true; }
+        if (text.Equals("/goal", StringComparison.OrdinalIgnoreCase) || text.StartsWith("/goal ", StringComparison.OrdinalIgnoreCase))
+        { Input = ""; ShowSuggestions = false; OpenGoal(); if (text.Length > 5 && ShowGoalEditor) GoalDraft = text[5..].Trim(); return true; }
+        return false;
+    }
+    [RelayCommand] private async Task CompactAsync()
+    {
+        if (SelectedModel is not { } model || !IsConfigured) { Status = "请先连接模型"; return; }
+        if (IsRunning) { _session.RequestCompaction(); Status = "将在当前操作完整结束后压缩"; return; }
+        if (!CanConfigure) return;
+        IsRunning = true;
+        try { await _session.CompactAsync(model, ReasoningEffort); } finally { IsRunning = false; }
+    }
+    [RelayCommand] private void OpenGoal()
+    { if (!CanConfigure) { Status = "请先停止执行再修改目标"; return; } GoalDraft = SessionGoal; ShowGoalEditor = true; }
+    [RelayCommand] private void CloseGoal() => ShowGoalEditor = false;
+    [RelayCommand] private async Task SaveGoalAsync()
+    {
+        if (!CanConfigure || !IsConfigured || SelectedModel is null || string.IsNullOrWhiteSpace(GoalDraft)) return;
+        _session.SetGoal(GoalDraft); SessionGoal = _session.Goal; ShowGoalEditor = false;
+        await RunMessageAsync("本次会话目标：" + SessionGoal);
+    }
+    [RelayCommand] private void ClearGoal()
+    { if (!CanConfigure) return; _session.SetGoal(""); SessionGoal = ""; ShowGoalEditor = false; }
+    [RelayCommand] private Task ContinueGoalAsync() => HasGoal ? RunMessageAsync("继续本次会话目标；请先核实实际状态，避免重复已完成的操作。") : Task.CompletedTask;
     [RelayCommand] private Task StopAsync() => _stopTask is { IsCompleted: false } existing ? existing : _stopTask = StopCoreAsync();
     private async Task StopCoreAsync()
     {
@@ -116,10 +199,31 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
         finally { IsStopping = false; IsRunning = false; Status = "就绪"; }
     }
     public Task CancelAndWaitAsync() => StopAsync();
-    [RelayCommand] private async Task NewConversationAsync() { await StopAsync(); _session.Clear(); Main.Operations.ResetHandles(); Timeline.Clear(); TimelineChanged?.Invoke(); }
+    [RelayCommand] private async Task NewConversationAsync() { await StopAsync(); _session.Clear(); Main.Operations.ResetHandles(); _toolItems.Clear(); Timeline.Clear(); Input = ""; SessionGoal = ""; GoalDraft = ""; ShowGoalEditor = false; ShowSuggestions = false; TimelineChanged?.Invoke(); }
     [RelayCommand] private void Suggest(string text) => Input = text;
     private void Receive(AgentUiEvent e)
     {
+        if (e.Kind == AgentUiEventKind.Context) { if (e.ContextUsage is not null) ContextUsage = e.ContextUsage; return; }
+        if (e.ToolCallId is { } callId)
+        {
+            if (e.Kind == AgentUiEventKind.ToolStarted)
+            {
+                if (!_toolItems.ContainsKey(callId))
+                {
+                    var group = Timeline.LastOrDefault() as AgentToolGroupItem;
+                    if (group is null) { group = new(); Timeline.Add(group); }
+                    var item = new AgentTimelineItem(e); _toolItems[callId] = item; group.Tools.Add(item);
+                }
+            }
+            else if (_toolItems.TryGetValue(callId, out var item))
+            {
+                if (e.Kind == AgentUiEventKind.ToolCompleted) item.Update(e);
+                else item.UpdateOperation(e);
+            }
+            else { Timeline.Add(new(e)); }
+            if (e.Kind == AgentUiEventKind.Operation) Status = e.Text.Length > 0 ? e.Text : e.Title;
+            TimelineChanged?.Invoke(); return;
+        }
         if (e.Kind == AgentUiEventKind.Status) { Status = e.Title; if (e.Text.Length > 0) Timeline.Add(new(e)); return; }
         var existing = e.Id is null ? null : Timeline.FirstOrDefault(x => x.Id == e.Id);
         if (e.Kind == AgentUiEventKind.Operation && e.Id is not null) Status = e.Text;
@@ -134,11 +238,17 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
             Status = "等待你的选择";
             card = new(new(AgentUiEventKind.Question, "需要你的选择"));
             foreach (var question in questions) card.Questions.Add(new(question));
-            card.Submit = () => { if (card.Questions.Any(x => string.IsNullOrWhiteSpace(x.Answer))) { card.Text = "请回答每一个问题"; return; } source.TrySetResult(card.Questions.ToDictionary(x => x.Id, x => x.Answer)); };
+            card.Submit = () =>
+            {
+                if (!card.CanRespond || cancellation.IsCancellationRequested) return;
+                if (card.Questions.Any(x => string.IsNullOrWhiteSpace(x.Answer))) { card.Text = "请回答每一个问题"; return; }
+                var answers = card.Questions.ToDictionary(x => x.Id, x => x.Answer);
+                if (source.TrySetResult(answers)) { card.ResolveQuestions(answers); TimelineChanged?.Invoke(); }
+            };
             Timeline.Add(card); TimelineChanged?.Invoke();
         });
         try { return await source.Task.WaitAsync(cancellation); }
-        finally { await Main.UiDispatcher.InvokeAsync(() => { if (card is not null) { card.CanRespond = false; card.Text = source.Task.IsCompletedSuccessfully ? "已回答" : "已中止"; } }); }
+        finally { await Main.UiDispatcher.InvokeAsync(() => { if (card is not null) { card.ResolveQuestions(source.Task.IsCompletedSuccessfully ? source.Task.Result : null); TimelineChanged?.Invoke(); } }); }
     }
     public async Task<bool> ApproveAsync(AgentApproval approval, CancellationToken cancellation)
     {
@@ -149,7 +259,10 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
     }
 }
 
-public sealed partial class AgentTimelineItem : ObservableObject
+public sealed record AgentComposerSuggestion(string Title, string Description, string Symbol, string? Command = null, AgentReference? Reference = null);
+public sealed record AgentComposerReference(AgentReference Reference, string Token);
+
+public partial class AgentTimelineItem : ObservableObject
 {
     public string? Id { get; }
     public AgentUiEventKind Kind { get; }
@@ -161,23 +274,74 @@ public sealed partial class AgentTimelineItem : ObservableObject
     [ObservableProperty] private bool _canRespond = true;
     [ObservableProperty] private DownloadTaskInfo? _taskProgress;
     [ObservableProperty] private bool _isProgressExpanded;
+    [ObservableProperty] private bool _isDetailExpanded;
+    [ObservableProperty] private bool _isQuestionExpanded;
+    [ObservableProperty] private string _questionSummaryTitle = "问题已中止";
+    [ObservableProperty] private AgentToolState? _toolState;
     public bool HasTaskProgress => TaskProgress is not null;
+    public bool HasActiveTaskProgress => TaskProgress?.IsActive == true;
     public bool HasPlainDetail => TaskProgress is null && Detail.Length > 0;
     public bool IsAssistant => Kind == AgentUiEventKind.Assistant;
     public bool IsUser => Kind == AgentUiEventKind.User;
-    public bool IsError => Kind is AgentUiEventKind.Error or AgentUiEventKind.Interrupted;
+    public bool IsError => Kind is AgentUiEventKind.Error or AgentUiEventKind.Interrupted || ToolState is AgentToolState.Failed or AgentToolState.Cancelled;
     public bool IsQuestion => Kind == AgentUiEventKind.Question;
+    public bool IsQuestionPending => IsQuestion && CanRespond;
+    public bool IsQuestionResolved => IsQuestion && !CanRespond;
     public bool IsApproval => Kind == AgentUiEventKind.Approval;
     public bool IsOperation => Kind == AgentUiEventKind.Operation;
+    public bool IsTool => Kind is AgentUiEventKind.ToolStarted or AgentUiEventKind.ToolCompleted;
+    public bool IsToolRunning => ToolState == AgentToolState.Running;
+    public string ToolMarker => ToolState switch { AgentToolState.Running => "·", AgentToolState.Failed => "!", AgentToolState.Cancelled => "–", _ => "✓" };
+    public string ToolCaption => IsToolRunning ? Text.Length > 0 ? Text : "执行中" : ToolState switch { AgentToolState.Failed => "未完成", AgentToolState.Cancelled => "已中止", _ => "已完成" };
     public ObservableCollection<AgentQuestionViewModel> Questions { get; } = new();
+    public ObservableCollection<AgentAnswerSummary> Answers { get; } = new();
     public Action? Submit { get; set; }
     public Action<bool>? Confirm { get; set; }
     public AgentTimelineItem(AgentUiEvent e) { Kind = e.Kind; Id = e.Id; Update(e); }
-    public void Update(AgentUiEvent e) { Title = e.Title; Text = e.Text; HasProgress = e.TaskProgress is null && e.Percent.HasValue; Progress = e.Percent ?? 0; if (e.Detail is not null) Detail = e.Detail; if (e.TaskProgress is not null) TaskProgress = e.TaskProgress; OnPropertyChanged(nameof(HasPlainDetail)); }
-    partial void OnTaskProgressChanged(DownloadTaskInfo? value) { OnPropertyChanged(nameof(HasTaskProgress)); OnPropertyChanged(nameof(HasPlainDetail)); }
+    public void Update(AgentUiEvent e) { Title = e.Title; Text = e.Text; HasProgress = e.TaskProgress is null && e.Percent.HasValue; Progress = e.Percent ?? 0; if (e.Detail is not null) Detail = e.Detail; if (e.TaskProgress is not null) TaskProgress = e.TaskProgress; if (e.ToolState is { } state) ToolState = state; OnPropertyChanged(nameof(HasPlainDetail)); OnPropertyChanged(nameof(ToolCaption)); }
+    public void UpdateOperation(AgentUiEvent e)
+    {
+        Update(e with { Title = Title, Text = e.TaskProgress?.Detail ?? (e.Text.Length > 0 ? e.Text : e.Title) });
+    }
+    partial void OnToolStateChanged(AgentToolState? value) { OnPropertyChanged(nameof(IsToolRunning)); OnPropertyChanged(nameof(IsError)); OnPropertyChanged(nameof(ToolMarker)); OnPropertyChanged(nameof(ToolCaption)); }
+    partial void OnTaskProgressChanged(DownloadTaskInfo? value) { OnPropertyChanged(nameof(HasTaskProgress)); OnPropertyChanged(nameof(HasActiveTaskProgress)); OnPropertyChanged(nameof(HasPlainDetail)); }
+    partial void OnCanRespondChanged(bool value) { OnPropertyChanged(nameof(IsQuestionPending)); OnPropertyChanged(nameof(IsQuestionResolved)); }
+    public void ResolveQuestions(IReadOnlyDictionary<string, string>? answers)
+    {
+        if (!IsQuestion || !CanRespond) return;
+        if (answers is not null)
+            foreach (var question in Questions)
+                if (answers.TryGetValue(question.Id, out var answer))
+                    Answers.Add(new(question.Prompt, answer, question.CustomInput.Trim().Length == 0 && question.SelectedOption?.Label == answer ? question.SelectedOption.Description : ""));
+        Questions.Clear();
+        QuestionSummaryTitle = answers is null ? "问题已中止" : $"已回答 {Answers.Count} 个问题";
+        Text = ""; IsQuestionExpanded = false; CanRespond = false;
+    }
     [RelayCommand] private void SubmitAnswers() => Submit?.Invoke();
     [RelayCommand] private void Approve() { if (CanRespond) Confirm?.Invoke(true); }
     [RelayCommand] private void Decline() { if (CanRespond) Confirm?.Invoke(false); }
+}
+public sealed record AgentAnswerSummary(string Prompt, string Answer, string Description);
+public sealed partial class AgentToolGroupItem : AgentTimelineItem
+{
+    [ObservableProperty] private bool _isExpanded = true;
+    private bool _wasRunning;
+    public ObservableCollection<AgentTimelineItem> Tools { get; } = new();
+    public AgentToolGroupItem() : base(new(AgentUiEventKind.Operation, "正在调用工具"))
+    {
+        Tools.CollectionChanged += (_, e) =>
+        {
+            if (e.NewItems is not null) foreach (AgentTimelineItem item in e.NewItems) item.PropertyChanged += (_, _) => Refresh();
+            Refresh();
+        };
+    }
+    private void Refresh()
+    {
+        var running = Tools.Any(t => t.IsToolRunning);
+        if (running != _wasRunning) IsExpanded = running;
+        _wasRunning = running;
+        Title = running ? "正在调用工具" : "调用了工具"; Text = Tools.Count + " 项";
+    }
 }
 public sealed partial class AgentQuestionViewModel(AgentQuestion question) : ObservableObject
 {

@@ -15,6 +15,8 @@ public sealed class NativeGameInstallEngine : IGameInstallEngine
     public async Task<string> InstallAsync(GameInstallRequest request, Action<DownloadTaskState, string, FileDownloadProgress?> update, CancellationToken token)
     {
         var plan = request.Plan; var staging = request.Staging; var runtime = request.Java; var readOnlyCache = request.ReadOnlyCache;
+        if (runtime is null && plan.Loader?.Loader is "Forge" or "NeoForge")
+            throw new InvalidOperationException("加载器安装需要 Java，请在“启动与Java”中添加");
         var game = plan.Game!;
         using var sources = new DownloadSources(plan.Sources, token);
         var progress = new InlineProgress<FileDownloadProgress>(p => update(DownloadTaskState.Downloading, sources.ActualSource, p));
@@ -43,7 +45,7 @@ public sealed class NativeGameInstallEngine : IGameInstallEngine
                 var selected = list.Single(v => v.ForgeVersionName == loader.Version);
                 {
                     var installer = new ForgeInstallerVersionMapper().CreateInstaller(selected);
-                    await installer.Install(launcher.MinecraftPath, launcher.GameInstaller, new ForgeInstallOptions { JavaPath = runtime.Path, CancellationToken = token, InstallerOutput = output, SkipIfAlreadyInstalled = false });
+                    await installer.Install(launcher.MinecraftPath, launcher.GameInstaller, new ForgeInstallOptions { JavaPath = runtime!.Path, CancellationToken = token, InstallerOutput = output, SkipIfAlreadyInstalled = false });
                     token.ThrowIfCancellationRequested(); installedId = installer.VersionName;
                 }
             }
@@ -51,7 +53,7 @@ public sealed class NativeGameInstallEngine : IGameInstallEngine
             {
                 var selected = new NeoForgeVersion(game.Id, loader.Version);
                 var installer = new NeoForgeInstallerVersionMapper().CreateInstaller(selected);
-                await installer.Install(launcher.MinecraftPath, launcher.GameInstaller, new NeoForgeInstallOptions { JavaPath = runtime.Path, CancellationToken = token, InstallerOutput = output, SkipIfAlreadyInstalled = false });
+                await installer.Install(launcher.MinecraftPath, launcher.GameInstaller, new NeoForgeInstallOptions { JavaPath = runtime!.Path, CancellationToken = token, InstallerOutput = output, SkipIfAlreadyInstalled = false });
                 token.ThrowIfCancellationRequested(); installedId = installer.VersionName;
             }
             else

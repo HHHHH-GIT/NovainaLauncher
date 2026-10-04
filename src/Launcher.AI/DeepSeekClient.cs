@@ -29,20 +29,33 @@ public sealed class DeepSeekClient(Func<string?> keyProvider, HttpClient? modelH
             var result = (json?["data"]?.AsArray() ?? throw new InvalidDataException("模型列表格式异常"))
                 .Select(x => new AgentModel(x!["id"]!.GetValue<string>(), x["name"]?.GetValue<string>() ?? x["id"]!.GetValue<string>(),
                     x["context_window"]?.GetValue<int>() ?? 131072, x["max_output_tokens"]?.GetValue<int>() ?? 16384,
-                    x["effort"]?["supported_levels"]?.AsArray().Select(e => e!.GetValue<string>()).ToArray())).ToArray();
+                    x["effort"]?["supported_levels"]?.AsArray().Select(e => e!.GetValue<string>()).ToArray())
+                    { HasVerifiedContextWindow = x["context_window"] is not null }).ToArray();
             if (result.Length == 0) throw new InvalidOperationException("未获取到可用模型");
             _models = result; _modelsAt = DateTimeOffset.UtcNow; return result;
         }
         finally { _modelGate.Release(); }
     }
-    public async Task<AgentResponse> RespondAsync(AgentModel model, string effort, JsonArray history, JsonArray tools, Action<string> textDelta, CancellationToken cancellation)
+    public Task<AgentResponse> RespondAsync(AgentModel model, string effort, JsonArray history, JsonArray tools, Action<string> textDelta, CancellationToken cancellation)
+        => RespondCoreAsync(model, effort, history, tools, AgentPrompt.System, 16384, textDelta, cancellation);
+    public async Task<AgentCompaction> CompactAsync(AgentModel model, string effort, JsonArray history, CancellationToken cancellation)
+    {
+        var response = await RespondCoreAsync(model, effort, history, [], AgentPrompt.Compaction, 8192, _ => { }, cancellation).ConfigureAwait(false);
+        if (response.Calls.Count != 0) throw new InvalidDataException("压缩响应包含工具调用，未替换上下文");
+        var text = string.Join("\n", response.Output.OfType<JsonObject>().Where(x => x["type"]?.ToString() == "message")
+            .SelectMany(x => x["content"]?.AsArray() ?? []).Where(x => x?["type"]?.ToString() == "output_text").Select(x => x!["text"]?.ToString()));
+        if (string.IsNullOrWhiteSpace(text) || text.Length > 24000) throw new InvalidDataException("压缩摘要无效，保留原上下文");
+        return new(text, response.OutputTokens, response.InputTokens);
+    }
+    private async Task<AgentResponse> RespondCoreAsync(AgentModel model, string effort, JsonArray history, JsonArray tools, string instructions, int maxOutput, Action<string> textDelta, CancellationToken cancellation)
     {
         var options = sdkOptions ?? new ResponsesClientOptions { Endpoint = new Uri("https://api.deepseek.com"), RetryPolicy = new ClientRetryPolicy(0), NetworkTimeout = TimeSpan.FromMinutes(5) };
         var client = new ResponsesClient(new ApiKeyCredential(Key), options);
-        var request = new CreateResponseOptions { Model = model.Id, Instructions = AgentPrompt.System,
-            MaxOutputTokenCount = Math.Min(16384, model.MaxOutputTokens), StoredOutputEnabled = false, StreamingEnabled = true };
+        var request = new CreateResponseOptions { Model = model.Id, Instructions = instructions,
+            MaxOutputTokenCount = Math.Min(maxOutput, model.MaxOutputTokens), StoredOutputEnabled = false, StreamingEnabled = true };
         request.Patch.Set("$.input"u8, BinaryData.FromString(history.ToJsonString()));
         request.Patch.Set("$.tools"u8, BinaryData.FromString(tools.ToJsonString()));
+        if (tools.Count == 0) request.Patch.Set("$.tool_choice"u8, BinaryData.FromString("\"none\""));
         if (model.Efforts is null || model.Efforts.Contains(effort))
             request.Patch.Set("$.reasoning"u8, BinaryData.FromString(new JsonObject { ["effort"] = effort }.ToJsonString()));
         AgentResponse? completed = null;

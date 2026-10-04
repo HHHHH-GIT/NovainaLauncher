@@ -29,7 +29,7 @@ public sealed class MarkdownText : StackPanel
         {
             _pending = false; Children.Clear();
             if (string.IsNullOrEmpty(Text)) return;
-            if (!EnableMarkdown) { var plain = TextBlock(); plain.Text = Text; Children.Add(plain); return; }
+            if (!EnableMarkdown) { var plain = TextBlock(); plain.Margin = new Thickness(0); plain.Text = Text; Children.Add(plain); return; }
             RenderBlocks(Markdown.Parse(Text, Pipeline), this);
         }));
     }

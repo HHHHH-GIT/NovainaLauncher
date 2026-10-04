@@ -4,7 +4,12 @@ using Launcher.Core;
 namespace Launcher.AI;
 
 public sealed record AgentModel(string Id, string Name, int ContextWindow = 131072, int MaxOutputTokens = 16384, IReadOnlyList<string>? Efforts = null)
-{ public override string ToString() => Name; }
+{ public bool HasVerifiedContextWindow { get; init; } = true; public override string ToString() => Name; }
+public sealed record AgentReference(string Kind, string Id, string Name, string Detail)
+{
+    public string KindLabel => Kind switch { "game" => "游戏", "java" => "Java", "account" => "账户", _ => "引用" };
+}
+public sealed record AgentCompaction(string Summary, int OutputTokens = 0, int InputTokens = 0);
 public sealed record AgentToolCall(string Id, string Name, string Arguments);
 public sealed record AgentResponse(JsonArray Output, IReadOnlyList<AgentToolCall> Calls, int OutputTokens, int InputTokens);
 public sealed record ToolResult(bool Success, string Summary, object? Data = null)
@@ -12,14 +17,21 @@ public sealed record ToolResult(bool Success, string Summary, object? Data = nul
 public sealed record AgentOption(string Label, string Description, bool Recommended = false);
 public sealed record AgentQuestion(string Id, string Prompt, IReadOnlyList<AgentOption> Options);
 public sealed record AgentApproval(string Title, string Detail);
-public enum AgentUiEventKind { User, Assistant, Status, Operation, Question, Approval, Error, Interrupted }
+public enum AgentUiEventKind { User, Assistant, Status, Operation, Question, Approval, Error, Interrupted, ToolStarted, ToolCompleted, Context }
+public enum AgentToolState { Running, Completed, Failed, Cancelled }
 public sealed record AgentUiEvent(AgentUiEventKind Kind, string Title, string Text = "", string? Id = null, double? Percent = null, string? Detail = null)
-{ public DownloadTaskInfo? TaskProgress { get; init; } }
+{
+    public DownloadTaskInfo? TaskProgress { get; init; }
+    public string? ToolCallId { get; init; }
+    public AgentToolState? ToolState { get; init; }
+    public AgentContextUsage? ContextUsage { get; init; }
+}
 
 public interface IDeepSeekClient
 {
     Task<IReadOnlyList<AgentModel>> GetModelsAsync(bool refresh, CancellationToken cancellation);
     Task<AgentResponse> RespondAsync(AgentModel model, string effort, JsonArray history, JsonArray tools, Action<string> textDelta, CancellationToken cancellation);
+    Task<AgentCompaction> CompactAsync(AgentModel model, string effort, JsonArray history, CancellationToken cancellation) => throw new NotSupportedException("此客户端不支持上下文压缩");
 }
 public interface IAgentInteraction
 {
@@ -29,6 +41,7 @@ public interface IAgentInteraction
 public sealed record AgentExecutionContext(Guid GroupId, IAgentInteraction Interaction, Action<AgentUiEvent> Emit, CancellationToken Cancellation);
 public interface ILauncherOperations
 {
+    IReadOnlyList<AgentReference> GetReferences() => [];
     Task<ToolResult> ExecuteAsync(string name, JsonObject arguments, AgentExecutionContext context);
     Task<AgentApproval> DescribeSensitiveAsync(string name, JsonObject arguments, CancellationToken cancellation);
     Task CancelGroupAsync(Guid groupId);
@@ -42,8 +55,14 @@ public interface IAgentToolRegistry
 public interface IAgentSessionService
 {
     bool IsRunning { get; }
+    string Goal { get; }
+    AgentContextUsage ContextUsage { get; }
     event Action<AgentUiEvent>? Event;
-    Task SendAsync(string text, AgentModel model, string effort, CancellationToken cancellation = default);
+    Task SendAsync(string text, AgentModel model, string effort, CancellationToken cancellation = default, IReadOnlyList<AgentReference>? references = null);
+    Task CompactAsync(AgentModel model, string effort, CancellationToken cancellation = default);
+    void RequestCompaction();
+    void SetGoal(string goal);
+    void SetModel(AgentModel model);
     Task StopAsync();
     void Clear();
 }

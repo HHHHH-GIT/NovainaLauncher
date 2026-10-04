@@ -12,9 +12,11 @@ public partial class TaskProgressView : UserControl
     public static readonly DependencyProperty TaskProperty = DependencyProperty.Register(nameof(Task), typeof(DownloadTaskInfo), typeof(TaskProgressView), new PropertyMetadata(null, Changed));
     public static readonly DependencyProperty IsExpandedProperty = DependencyProperty.Register(nameof(IsExpanded), typeof(bool), typeof(TaskProgressView), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, Changed));
     public static readonly DependencyProperty AccentProperty = DependencyProperty.Register(nameof(Accent), typeof(Brush), typeof(TaskProgressView));
+    public static readonly DependencyProperty InlineDetailsProperty = DependencyProperty.Register(nameof(InlineDetails), typeof(bool), typeof(TaskProgressView), new PropertyMetadata(false));
     public DownloadTaskInfo? Task { get => (DownloadTaskInfo?)GetValue(TaskProperty); set => SetValue(TaskProperty, value); }
     public bool IsExpanded { get => (bool)GetValue(IsExpandedProperty); set => SetValue(IsExpandedProperty, value); }
     public Brush? Accent { get => (Brush?)GetValue(AccentProperty); set => SetValue(AccentProperty, value); }
+    public bool InlineDetails { get => (bool)GetValue(InlineDetailsProperty); set => SetValue(InlineDetailsProperty, value); }
     public ObservableCollection<DownloadConnectionRow> Connections { get; } = new();
     public TaskProgressView() => InitializeComponent();
     private static void Changed(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((TaskProgressView)d).UpdateConnections();

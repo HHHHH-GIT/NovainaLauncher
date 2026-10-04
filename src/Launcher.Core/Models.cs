@@ -48,6 +48,8 @@ public sealed record VersionInfo(string Id, string Root, string Loader, int? Req
     public string GameName { get; init; } = Id;
     public string MinecraftVersion { get; init; } = "";
     public string LoaderVersion { get; init; } = "";
+    public string MinecraftVersionLabel => string.IsNullOrWhiteSpace(MinecraftVersion) ? "版本未知" : MinecraftVersion;
+    public string RecommendedJavaLabel => RequiredJava is int major ? $"Java {major}" : "Java 待指定";
     public string DownloadTargetTag => IsValid ? $"{Loader} · {(string.IsNullOrWhiteSpace(MinecraftVersion) ? "版本未知" : MinecraftVersion)}" : "损坏";
     public string? ParentId { get; init; }
     public string VersionType { get; init; } = "release";
@@ -104,6 +106,7 @@ public sealed class LauncherSettings
     public int MemoryMb { get; set; } = 4096;
     public MemoryAllocationMode MemoryAllocationMode { get; set; } = MemoryAllocationMode.Smart;
     public string JavaDownloadDirectory { get; set; } = AppPaths.Runtime;
+    public bool AutoPrepareJava { get; set; } = true;
     public int WindowTransparencyPercent { get; set; }
     public string MicrosoftClientId { get; set; } = "e1e383f9-59d9-4aa2-bf5e-73fe83b15ba0";
     public Dictionary<string, string> JavaOverrides { get; set; } = new();

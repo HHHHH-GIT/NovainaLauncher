@@ -78,16 +78,20 @@
                         <TextBlock Text="{Binding Main.CurrentVersion.GameName, FallbackValue='未选择版本'}" 
                                    FontSize="20" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
                         
-                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <Border Background="#14007AFF" CornerRadius="6" Padding="6,2" Margin="0,0,6,0">
-                                <TextBlock Text="{Binding Main.CurrentVersion.Loader, FallbackValue='原版'}" 
+                        <WrapPanel x:Name="VersionTags" Margin="0,8,0,0">
+                            <Border Background="#14007AFF" CornerRadius="6" Padding="6,2" Margin="0,0,6,4" ToolTip="Minecraft 版本">
+                                <TextBlock Text="{Binding Main.CurrentVersion.MinecraftVersionLabel, FallbackValue='版本未知'}"
                                            FontSize="11" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" />
                             </Border>
-                            <Border Background="#12000000" CornerRadius="6" Padding="6,2">
-                                <TextBlock Text="{Binding Main.CurrentVersion.Detail, FallbackValue='待扫描'}" 
+                            <Border Background="#12007AFF" CornerRadius="6" Padding="6,2" Margin="0,0,6,4" ToolTip="推荐 Java 版本">
+                                <TextBlock Text="{Binding Main.CurrentVersion.RecommendedJavaLabel, FallbackValue='Java 待指定'}"
                                            FontSize="11" FontWeight="Medium" Foreground="{DynamicResource TextSecondaryBrush}" />
                             </Border>
-                        </StackPanel>
+                            <Border Background="#12007AFF" CornerRadius="6" Padding="6,2" Margin="0,0,0,4" ToolTip="加载器类型">
+                                <TextBlock Text="{Binding Main.CurrentVersion.TagLabel, FallbackValue='未选择'}"
+                                           FontSize="11" FontWeight="Medium" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </Border>
+                        </WrapPanel>
                     </StackPanel>
 
                     <Button Grid.Row="2" Style="{StaticResource AppleSecondaryButton}" Content="选择版本" Command="{Binding GoToVersionsCommand}" HorizontalAlignment="Stretch" />

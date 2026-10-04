@@ -101,6 +101,9 @@ public class UiRegressionTests
                 vm.Navigate("Settings");
                 root.Measure(new Size(1080, 700)); root.Arrange(new Rect(0, 0, 1080, 700)); root.UpdateLayout();
                 var settingsPage = Descendants(root).OfType<Launcher.App.Views.Pages.SettingsPage>().Single();
+                var autoJava = Assert.IsType<CheckBox>(settingsPage.FindName("AutoPrepareJavaSwitch"));
+                Assert.True(autoJava.IsChecked); autoJava.IsChecked = false;
+                Assert.False(vm.Settings.AutoPrepareJava); autoJava.IsChecked = true;
                 settingsPage.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
                 vm.SettingsVM.AnimationIndex = 0;
                 Assert.Equal("关闭", vm.SettingsVM.AnimationLabel);
@@ -128,7 +131,15 @@ public class UiRegressionTests
                 vm.SettingsVM.AddDanmakuRuleCommand.Execute(null);
                 var rule = vm.SettingsVM.DanmakuRules.Last(); rule.MatchIndex = 1; rule.Pattern = "["; rule.Enabled = true;
                 Assert.False(rule.Enabled); Assert.NotEmpty(rule.Error);
-                foreach (var section in new[] { "Danmaku", "Downloads", "Data" })
+                Assert.Equal(new[] { "Appearance", "Danmaku", "LaunchJava", "DownloadsData", "AI" }, SettingsViewModel.Sections.Select(x => x.Id));
+                Assert.DoesNotContain(Descendants(settingsPage).OfType<TextBlock>(), text => text.Text == "微软 Client ID");
+                foreach (var sectionName in new[] { "LaunchJavaSection", "DownloadsDataSection" })
+                {
+                    var group = Assert.IsType<StackPanel>(settingsPage.FindName(sectionName));
+                    Assert.Single(Descendants(group).OfType<Border>(), card => ReferenceEquals(card.Style, app.Resources["AppleCard"]));
+                    Assert.DoesNotContain(Descendants(group).OfType<TextBlock>(), text => text.Text is "Java" or "数据");
+                }
+                foreach (var section in new[] { "Danmaku", "LaunchJava", "DownloadsData" })
                 {
                     vm.SettingsVM.NavigateSection(section); root.UpdateLayout();
                     Assert.Equal(section, vm.SettingsVM.SelectedSection); Assert.True(vm.SettingsVM.ScrollOffset > 0);
@@ -136,10 +147,14 @@ public class UiRegressionTests
                     var image = new PngBitmapEncoder(); image.Frames.Add(BitmapFrame.Create(snapshot));
                     using var screenshot = System.IO.File.Create(System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "../../../../../artifacts/ui/" + section + "-settings-light.png"))); image.Save(screenshot);
                 }
-                vm.SettingsVM.NavigateSection("Advanced"); root.UpdateLayout();
+                vm.SettingsVM.NavigateSection("Java"); root.UpdateLayout();
+                Assert.Equal("LaunchJava", vm.SettingsVM.SelectedSection);
+                vm.SettingsVM.NavigateSection("Data"); root.UpdateLayout();
+                Assert.Equal("DownloadsData", vm.SettingsVM.SelectedSection);
+                vm.SettingsVM.NavigateSection("AI"); root.UpdateLayout();
                 Assert.False(vm.SettingsVM.HasPendingSection);
                 Assert.True(vm.SettingsVM.ScrollOffset > 0);
-                Assert.Equal("Advanced", vm.SettingsVM.SelectedSection);
+                Assert.Equal("AI", vm.SettingsVM.SelectedSection);
                 var scroll = vm.SettingsVM.ScrollOffset;
                 vm.ToggleSidebar(); root.UpdateLayout();
                 Assert.Same(settingsPage, Descendants(root).OfType<Launcher.App.Views.Pages.SettingsPage>().Single());
@@ -256,6 +271,11 @@ public class UiRegressionTests
                 Assert.Equal("Versions", vm.CurrentPage);
                 vm.VersionsVM.SelectAndLaunch(version);
                 Assert.Equal("Launch", vm.CurrentPage);
+                root.UpdateLayout(); Pump(); root.UpdateLayout();
+                var launchPage = Descendants(root).OfType<Launcher.App.Views.Pages.LaunchPage>().Single();
+                var tags = Assert.IsType<WrapPanel>(launchPage.FindName("VersionTags"));
+                Assert.Equal(new[] { "1.21", "Java 21", "Fabric" }, Descendants(tags).OfType<TextBlock>().Select(t => t.Text));
+                SavePreview(root, "Launch-version-tags.png");
                 vm.Navigate("Versions"); root.UpdateLayout(); Pump(); root.UpdateLayout();
                 var versionRow = Descendants(root).OfType<Border>().Single(x => x.Style == app.Resources["SelectedItemRow"] && Equals(x.Tag, true));
                 Assert.Equal("#22007AFF", versionRow.Background.ToString());
@@ -376,6 +396,7 @@ public class UiRegressionTests
         vm.SettingsVM.Theme = "Dark"; Capture("AI-welcome-dark");
         vm.AgentVM.IsConfigured = true;
         vm.AgentVM.Models.Add(new("fixture-pro", "DeepSeek Pro")); vm.AgentVM.Models.Add(new("fixture-flash", "DeepSeek Flash")); vm.AgentVM.SelectedModel = vm.AgentVM.Models[0];
+        vm.SettingsVM.Theme = "Light"; Capture("AI-empty-light"); vm.SettingsVM.Theme = "Dark"; Capture("AI-empty-dark");
         vm.AgentVM.Timeline.Add(new(new(AgentUiEventKind.User, "你", "想玩一个探索类整合包")));
         vm.AgentVM.Timeline.Add(new(new(AgentUiEventKind.Assistant, "DeepSeek", "找到了几个候选。先选一下版本和玩法，再为你安装。")));
         var question = new AgentTimelineItem(new(AgentUiEventKind.Question, "需要你的选择"));
@@ -385,6 +406,8 @@ public class UiRegressionTests
         vm.SettingsVM.Theme = "Light"; Capture("AI-timeline-light"); vm.SettingsVM.Theme = "Dark"; Capture("AI-timeline-dark");
         CheckAgentScrollingAndComposition();
         CheckAgentThemeMarkdownAndProgress();
+        CheckGroupedTools();
+        CheckContextAndComposerCommands();
         vm.RequestAccountLogin(); Layout(); Assert.False(vm.AiSurfaceVisible); Assert.True(vm.NormalSurfaceVisible); Assert.Equal("Accounts", vm.CurrentPage);
         vm.CompleteAccountLogin(); Layout(); Assert.Equal(page, vm.CurrentPage);
         vm.IsAiMode = false; Pump(); Layout(); Assert.Equal(page, vm.CurrentPage); Assert.Equal(sidebar, vm.EffectiveSidebarExpanded);
@@ -394,7 +417,7 @@ public class UiRegressionTests
         void Layout() { root.Measure(new Size(1080, 700)); root.Arrange(new Rect(0, 0, 1080, 700)); root.UpdateLayout(); }
         void Capture(string name)
         {
-            Layout(); var image = new RenderTargetBitmap(1080, 700, 96, 96, PixelFormats.Pbgra32); image.Render(root);
+            Layout(); Pump(); Layout(); var image = new RenderTargetBitmap(1080, 700, 96, 96, PixelFormats.Pbgra32); image.Render(root);
             var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image));
             using var output = System.IO.File.Create(System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "../../../../../artifacts/ui/" + name + ".png"))); encoder.Save(output);
         }
@@ -426,6 +449,13 @@ public class UiRegressionTests
             options.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice, 0, 120) { RoutedEvent = Mouse.PreviewMouseWheelEvent });
             Layout(); Pump(); Layout(); Assert.InRange(before - scroll.VerticalOffset, 60, 85);
             vm.AgentVM.Input = ""; Assert.Equal(Visibility.Visible, placeholder.Visibility);
+            Layout(); Pump(); Layout();
+            var caret = composer.GetRectFromCharacterIndex(0);
+            Assert.False(caret.IsEmpty);
+            var caretTop = composer.TranslatePoint(caret.TopLeft, agentPage);
+            var placeholderTop = placeholder.TranslatePoint(new Point(placeholder.Padding.Left, placeholder.Padding.Top), agentPage);
+            Assert.InRange(Math.Abs(caretTop.Y - placeholderTop.Y), 0, 1);
+            Assert.InRange(Math.Abs(caretTop.X - placeholderTop.X), 0, 1);
             var composition = new TextComposition(InputManager.Current, composer, "wo");
             composer.RaiseEvent(new TextCompositionEventArgs(Keyboard.PrimaryDevice, composition) { RoutedEvent = TextCompositionManager.PreviewTextInputStartEvent });
             Assert.Equal(Visibility.Collapsed, placeholder.Visibility); Assert.Equal("", composer.Text);
@@ -441,12 +471,66 @@ public class UiRegressionTests
             scroll.ScrollToEnd(); Layout(); Pump(); Capture("AI-question-scroll-bottom");
             vm.AgentVM.Timeline.Remove(tall);
         }
+        void CheckContextAndComposerCommands()
+        {
+            // Popups defer IsOpen until Loaded; the main layout fixture intentionally never shows its window.
+            // A separate invisible host tests the native popup lifecycle without initializing the real launcher.
+            var agentPage = new Launcher.App.Views.Pages.AgentPage { DataContext = vm.AgentVM };
+            var popupHost = new Window { Content = agentPage, Width = 860, Height = 700, Left = -10000, Top = -10000, Opacity = 0, ShowInTaskbar = false, ShowActivated = false, WindowStyle = WindowStyle.None };
+            ((System.Windows.Controls.Primitives.Popup)agentPage.FindName("ContextPopup")).Child.Opacity = 0;
+            ((System.Windows.Controls.Primitives.Popup)agentPage.FindName("SuggestionsPopup")).Child.Opacity = 0;
+            popupHost.Show(); Pump();
+            try
+            {
+            var ring = (Button)agentPage.FindName("ContextRingButton");
+            var popup = (System.Windows.Controls.Primitives.Popup)agentPage.FindName("ContextPopup");
+            ring.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
+            Assert.True(popup.IsOpen); Assert.Same(vm.AgentVM, popup.Child.GetValue(FrameworkElement.DataContextProperty));
+            ring.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseLeaveEvent }); Assert.False(popup.IsOpen);
+            ring.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            ring.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseLeaveEvent }); Assert.True(popup.IsOpen);
+            var close = Descendants(popup.Child).OfType<Button>().Single(x => Equals(x.Content, "×")); close.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Assert.False(popup.IsOpen);
+            vm.AgentVM.Input = "/"; vm.AgentVM.UpdateSuggestions(1); Assert.Equal(2, vm.AgentVM.Suggestions.Count);
+            vm.AgentVM.Input = "/com"; vm.AgentVM.UpdateSuggestions(4); Assert.Equal("/compact", Assert.Single(vm.AgentVM.Suggestions).Title);
+            vm.AgentVM.ShowSuggestions = false;
+            var current = vm.CurrentVersion; var account = vm.CurrentAccount;
+            vm.AgentVM.Input = "@"; vm.AgentVM.UpdateSuggestions(1);
+            var reference = Assert.Single(vm.AgentVM.Suggestions.Where(s => s.Reference?.Kind == "game").Take(1));
+            vm.AgentVM.AcceptSuggestionAsync(reference).GetAwaiter().GetResult();
+            Assert.Single(vm.AgentVM.DraftReferences); Assert.Contains("@「游戏：", vm.AgentVM.Input);
+            Assert.Same(current, vm.CurrentVersion); Assert.Same(account, vm.CurrentAccount);
+            vm.AgentVM.Input = ""; Assert.Empty(vm.AgentVM.DraftReferences);
+            vm.AgentVM.Input = "/goal 创建冒险整合包"; vm.AgentVM.TryExecuteLocalInputAsync().GetAwaiter().GetResult();
+            Assert.True(vm.AgentVM.ShowGoalEditor); Assert.Equal("创建冒险整合包", vm.AgentVM.GoalDraft);
+            vm.AgentVM.CloseGoalCommand.Execute(null); vm.AgentVM.Input = ""; vm.AgentVM.ShowSuggestions = false;
+            var usage = vm.AgentVM.ContextUsage;
+            vm.AgentVM.ContextUsage = new(65000, 131072, [new("系统提示与工具定义", 4000), new("用户输入", 6000), new("模型输出与推理", 12000), new("工具调用与结果", 19000), new("日志内容", 15000), new("压缩摘要", 8000), new("目标与引用", 1000)]) { CapacityVerified = true, CompactionCount = 1, LastSavedTokens = 30000, LastInputTokens = 62000, LastOutputTokens = 3000 };
+            foreach (var theme in new[] { "Light", "Dark" })
+            {
+                vm.SettingsVM.Theme = theme; Capture("AI-context-composer-" + theme.ToLowerInvariant());
+                ring.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(); ((FrameworkElement)popup.Child).UpdateLayout();
+                Assert.Contains(Descendants(popup.Child).OfType<TextBlock>(), t => t.Text == "日志内容");
+                Assert.Contains(Descendants(popup.Child).OfType<TextBlock>(), t => t.Text == "15K");
+                if (theme == "Dark") Assert.True(((SolidColorBrush)((Border)popup.Child).Background).Color.G < 70);
+                close.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                vm.AgentVM.Input = "/"; vm.AgentVM.UpdateSuggestions(1); Pump();
+                var menu = (System.Windows.Controls.Primitives.Popup)agentPage.FindName("SuggestionsPopup");
+                ((FrameworkElement)menu.Child).UpdateLayout(); Assert.True(menu.IsOpen);
+                Assert.Contains(Descendants(menu.Child).OfType<TextBlock>(), t => t.Text == "/compact");
+                Assert.Contains(Descendants(menu.Child).OfType<TextBlock>(), t => t.Text == "/goal");
+                vm.AgentVM.ShowSuggestions = false;
+            }
+            vm.AgentVM.ContextUsage = usage; vm.AgentVM.Input = "";
+            Assert.Equal(46, ((Border)window.FindName("TitleBar")).ActualHeight);
+            }
+            finally { popupHost.Close(); }
+        }
         void CheckAgentThemeMarkdownAndProgress()
         {
             var agentPage = (Launcher.App.Views.Pages.AgentPage)window.FindName("AgentSurface");
             var assistant = vm.AgentVM.Timeline.First(x => x.IsAssistant);
             assistant.Text = "## 安装结果\n\n**已经安装** `cloth-config.jar`，请检查日志。\n\n- Minecraft 1.20.1\n- Forge\n\n[项目页面](https://example.test/mod) [不安全链接](file:///C:/private)\n\n```text\n游戏已就绪\n```";
-            question.Questions[0].SelectedOption = question.Questions[0].Options[1]; question.CanRespond = false;
+            question.Questions[0].SelectedOption = question.Questions[0].Options[1];
             Layout(); Pump(); Layout();
             var markdown = Descendants(agentPage).OfType<MarkdownText>().Single(x => x.Text == assistant.Text);
             var text = Descendants(markdown).OfType<TextBlock>().ToArray();
@@ -463,8 +547,43 @@ public class UiRegressionTests
                 var color = Assert.IsType<SolidColorBrush>(choice.Background).Color;
                 Assert.Equal(((SolidColorBrush)Application.Current.Resources["AiChoiceSelectedBrush"]).Color, color);
                 if (theme == "Dark") Assert.True(color.R < 80 && color.G < 100 && color.B < 120);
-                Capture("AI-answered-markdown-" + theme.ToLowerInvariant());
+                Capture("AI-selected-markdown-" + theme.ToLowerInvariant());
             }
+            question.ResolveQuestions(new Dictionary<string, string> { ["version"] = "1.21.1" });
+            var answerTask = vm.AgentVM.AskAsync([
+                new("action", "接下来做什么？", [new("只安装", "保留安装结果"), new("安装并启动", "启动现有游戏")]),
+                new("extra", "额外要求？", [new("默认方案", "使用推荐设置"), new("稍后处理", "暂不调整")])
+            ], CancellationToken.None);
+            Pump(); Layout();
+            var answered = vm.AgentVM.Timeline.Last();
+            answered.SubmitAnswersCommand.Execute(null);
+            Assert.False(answerTask.IsCompleted); Assert.True(answered.CanRespond);
+            answered.Questions[0].SelectedOption = answered.Questions[0].Options[1];
+            answered.Questions[1].SelectedOption = answered.Questions[1].Options[0];
+            answered.Questions[1].CustomInput = "先分析当前日志";
+            answered.SubmitAnswersCommand.Execute(null);
+            var deadline = DateTime.UtcNow.AddSeconds(2);
+            while (!answerTask.IsCompleted && DateTime.UtcNow < deadline) { Pump(); Thread.Sleep(5); }
+            Assert.True(answerTask.IsCompletedSuccessfully);
+            Assert.Equal("安装并启动", answerTask.Result["action"]); Assert.Equal("先分析当前日志", answerTask.Result["extra"]);
+            Assert.False(answered.IsQuestionExpanded); Assert.False(answered.CanRespond); Assert.Empty(answered.Questions);
+            Assert.Equal("启动现有游戏", answered.Answers[0].Description); Assert.Equal("", answered.Answers[1].Description);
+            outer.ScrollIntoView(answered); Layout(); Pump(); Layout();
+            var answeredRow = (ListBoxItem)outer.ItemContainerGenerator.ContainerFromItem(answered);
+            var summary = Descendants(answeredRow).OfType<Expander>().Single(e => e.Visibility == Visibility.Visible);
+            Assert.False(summary.IsExpanded);
+            Capture("AI-answers-collapsed-dark");
+            answered.IsQuestionExpanded = true; Layout(); Pump(); Layout();
+            var answersScroll = (ScrollViewer)outer.Template.FindName("PART_ScrollViewer", outer);
+            answersScroll.ScrollToVerticalOffset(answersScroll.VerticalOffset + answeredRow.TranslatePoint(new Point(), answersScroll).Y);
+            Layout(); Pump(); Layout();
+            Assert.True(summary.IsExpanded);
+            Assert.Empty(Descendants(answeredRow).OfType<ListBox>());
+            var answersText = Descendants(answeredRow).OfType<TextBlock>().Select(t => t.Text).ToArray();
+            Assert.Contains("安装并启动", answersText); Assert.Contains("先分析当前日志", answersText);
+            Assert.DoesNotContain("只安装", answersText); Assert.DoesNotContain("默认方案", answersText);
+            foreach (var theme in new[] { "Light", "Dark" }) { vm.SettingsVM.Theme = theme; Capture("AI-answers-expanded-" + theme.ToLowerInvariant()); }
+            answered.IsQuestionExpanded = false;
             var id = Guid.NewGuid();
             var state = new DownloadTaskInfo(id, "测试游戏", DownloadTaskState.Downloading, "资源文件", new(100, 100, 1000, [new(1, 100, 100, 1000, "下载中")])) { OverallProgress = new(2, 4, "安装与校验游戏") };
             var item = new AgentTimelineItem(new(AgentUiEventKind.Operation, state.Name, Id: id.ToString()) { TaskProgress = state }) { IsProgressExpanded = true };
@@ -479,6 +598,64 @@ public class UiRegressionTests
             Assert.Equal(50, progress.Task!.Percent); Assert.Equal(0, progress.Task.StagePercent);
             Capture("AI-parent-progress-dark");
             vm.AgentVM.Timeline.Remove(item);
+        }
+        void CheckGroupedTools()
+        {
+            var saved = vm.AgentVM.Timeline.ToArray(); vm.AgentVM.Timeline.Clear();
+            void Feed(AgentUiEvent e) => typeof(AgentViewModel).GetMethod("Receive", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(vm.AgentVM, [e]);
+            Feed(new(AgentUiEventKind.User, "你", "帮我打造一个 1.20.1 冒险整合包，加入地图与性能优化。"));
+            Feed(new(AgentUiEventKind.Assistant, "DeepSeek", "先确定你的冒险方向。", "preview-message"));
+            Feed(new(AgentUiEventKind.ToolStarted, "查询游戏版本") { ToolCallId = "preview-a", ToolState = AgentToolState.Running });
+            var group = Assert.IsType<AgentToolGroupItem>(vm.AgentVM.Timeline.Last());
+            Assert.Equal("正在调用工具", group.Title);
+            Assert.True(group.IsExpanded);
+            Layout(); Pump(); Layout();
+            var agentPage = (Launcher.App.Views.Pages.AgentPage)window.FindName("AgentSurface");
+            var userText = Descendants(agentPage).OfType<MarkdownText>().Single(x => !x.EnableMarkdown && x.Text.StartsWith("帮我打造"));
+            var textBlock = Descendants(userText).OfType<TextBlock>().Single();
+            DependencyObject ancestor = userText;
+            while (ancestor is not Border) ancestor = VisualTreeHelper.GetParent(ancestor);
+            var bubble = (Border)ancestor;
+            var textTop = textBlock.TranslatePoint(new Point(), bubble).Y;
+            Assert.InRange(Math.Abs(textTop - (bubble.ActualHeight - textTop - textBlock.ActualHeight)), 0, .01);
+            var id = Guid.NewGuid();
+            var state = new DownloadTaskInfo(id, "探索世界", DownloadTaskState.Completed, "游戏已就绪", new(100, 100, 0, [])) { OverallProgress = new(4, 4, "游戏已就绪") };
+            Feed(new(AgentUiEventKind.Operation, "探索世界", Id: "preview-progress") { ToolCallId = "preview-a", TaskProgress = state });
+            Feed(new(AgentUiEventKind.ToolCompleted, "游戏版本已就绪", Detail: "Minecraft：1.20.1\n加载器：Forge\nJava：17") { ToolCallId = "preview-a", ToolState = AgentToolState.Completed });
+            Feed(new(AgentUiEventKind.ToolStarted, "搜索模组") { ToolCallId = "preview-b", ToolState = AgentToolState.Running });
+            Assert.Same(group, vm.AgentVM.Timeline.Last()); Assert.Equal(2, group.Tools.Count);
+            Assert.Equal("正在调用工具", group.Title);
+            Assert.True(group.IsExpanded);
+            Feed(new(AgentUiEventKind.ToolCompleted, "找到钠和小地图", Detail: "钠 (Sodium)\n旅行地图 (JourneyMap)") { ToolCallId = "preview-b", ToolState = AgentToolState.Completed });
+            Assert.Equal("调用了工具", group.Title);
+            Assert.False(group.IsExpanded);
+            vm.SettingsVM.Theme = "Dark"; Capture("AI-tools-dark");
+            group.IsExpanded = true;
+            group.Tools[0].IsDetailExpanded = true; Layout(); Pump(); Layout();
+            var inline = Descendants(agentPage).OfType<TaskProgressView>().Single(p => p.Task?.Id == id);
+            Assert.True(inline.InlineDetails); Assert.Empty(Descendants(inline).OfType<System.Windows.Controls.Primitives.ToggleButton>());
+            Capture("AI-tools-expanded-dark");
+            group.Tools[0].IsDetailExpanded = false;
+            Feed(new(AgentUiEventKind.Assistant, "DeepSeek", "请选择玩法和游戏版本。", "preview-boundary"));
+            Feed(new(AgentUiEventKind.ToolStarted, "查询加载器") { ToolCallId = "preview-c", ToolState = AgentToolState.Running });
+            var next = Assert.IsType<AgentToolGroupItem>(vm.AgentVM.Timeline.Last()); Assert.NotSame(group, next);
+            Feed(new(AgentUiEventKind.ToolCompleted, "查询失败", Detail: "来源不可用") { ToolCallId = "preview-c", ToolState = AgentToolState.Failed });
+            Assert.Equal("调用了工具", next.Title); Assert.True(next.Tools[0].IsError);
+            Assert.False(next.IsExpanded);
+            var questions = new AgentTimelineItem(new(AgentUiEventKind.Question, "需要你的选择"));
+            questions.Questions.Add(new(new("type", "想玩什么类型？", [new("探索与冒险", "世界、地形和地图", true), new("科技与自动化", "机器与流水线")])));
+            questions.Questions.Add(new(new("version", "选择游戏版本", [new("Minecraft 1.20.1", "整合包选择较多", true), new("Minecraft 1.21.1", "较新的玩法")])));
+            vm.AgentVM.Timeline.Add(questions); Layout(); Pump(); Layout();
+            var panel = Descendants(agentPage).OfType<AdaptiveQuestionPanel>().Single(p => p.Children.Count == 2);
+            Assert.Equal(panel.Children[0].TranslatePoint(new Point(), panel).Y, panel.Children[1].TranslatePoint(new Point(), panel).Y);
+            var list = (ListBox)agentPage.FindName("TimelineList");
+            list.ScrollIntoView(questions); Layout(); Pump(); Layout();
+            var scroll = (ScrollViewer)list.Template.FindName("PART_ScrollViewer", list);
+            var card = (ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(questions);
+            scroll.ScrollToVerticalOffset(scroll.VerticalOffset + card.TranslatePoint(new Point(), scroll).Y);
+            Layout(); Pump(); Layout();
+            vm.SettingsVM.Theme = "Light"; Capture("AI-question-columns-light"); vm.SettingsVM.Theme = "Dark"; Capture("AI-question-columns-dark");
+            vm.AgentVM.Timeline.Clear(); foreach (var item in saved) vm.AgentVM.Timeline.Add(item);
         }
     }
 

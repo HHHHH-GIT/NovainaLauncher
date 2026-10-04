@@ -16,7 +16,7 @@ public sealed class LauncherOperations(MainViewModel main) : ILauncherOperations
 {
     private readonly DownloadCatalogService _catalog = new();
     private readonly ModReleaseCache _releaseCache = new();
-    private readonly Dictionary<string, object> _handles = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, object> _handles = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, byte> _writes = new(StringComparer.OrdinalIgnoreCase);
     private Task<T> UI<T>(Func<T> action) => main.UiDispatcher.InvokeAsync(action).Task;
     private Task UI(Action action) => main.UiDispatcher.InvokeAsync(action).Task;
@@ -24,6 +24,11 @@ public sealed class LauncherOperations(MainViewModel main) : ILauncherOperations
     private Task UIAsync(Func<Task> action) => main.UiDispatcher.InvokeAsync(action).Task.Unwrap();
     public bool IsDirectoryBusy(string directory) => _writes.ContainsKey(Path.GetFullPath(directory));
     public void ResetHandles() => _handles.Clear();
+    public IReadOnlyList<AgentReference> GetReferences() => main.UiDispatcher.CheckAccess() ? ReferencesOnUi() : main.UiDispatcher.Invoke(ReferencesOnUi);
+    private IReadOnlyList<AgentReference> ReferencesOnUi() => main.VersionsVM.Versions
+        .Select(v => new AgentReference("game", Local(v), v.GameName, $"Minecraft {v.MinecraftVersion} · {v.Loader} {v.LoaderVersion}".Trim()))
+        .Concat(main.SettingsVM.InstalledJavas.Select(j => new AgentReference("java", Handle("java", j.Path, j), $"Java {j.Major} · {j.Vendor}", $"{j.Version} · {j.Architecture}")))
+        .Concat(main.AccountsVM.Accounts.Select(a => new AgentReference("account", Handle("account", a.Id, a), a.Name, a.KindLabel))).ToArray();
     private string Handle<T>(string prefix, string key, T value) where T : notnull
     {
         var id = prefix + "-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..20].ToLowerInvariant();
@@ -41,7 +46,7 @@ public sealed class LauncherOperations(MainViewModel main) : ILauncherOperations
         AgentPathGuard.Within(plan.Root, plan.Directory);
         if (main.SettingsVM.IsChangingData) throw new InvalidOperationException("正在迁移数据");
         if (plan.Content?.Kind != CatalogKind.Mod) VersionManagementService.ValidateName(plan.Name);
-        return main.DownloadsVM.Queue.Enqueue(plan, group);
+        return main.DownloadsVM.Queue.Enqueue(plan with { AutoPrepareJava = main.Settings.AutoPrepareJava }, group);
     }
     public InstallPlan GamePlan(string name, GameCatalogVersion? game, LoaderCatalogVersion? loader, OptiFineCatalogVersion? optifine) =>
         new(name.Trim(), main.Settings.GameRoot, game, loader, optifine, null, null, null, Sources, main.Settings.JavaDownloadDirectory, main.SettingsVM.InstalledJavas.ToArray());
@@ -169,7 +174,7 @@ public sealed class LauncherOperations(MainViewModel main) : ILauncherOperations
                 {
                     var (v, item) = Resolve<(VersionInfo, VersionContentItem)>(S(a, "item_id")); var dir = DirectoryFor(v); AgentPathGuard.Within(dir, item.Path);
                     await WriteAsync(dir, async () => { var service = new VersionContentService(); if (name == "delete_content") await service.DeleteAsync(dir, item, token); else if (item.Enabled != a["enabled"]!.GetValue<bool>()) await service.ToggleAsync(dir, item, token); });
-                    _handles.Remove(S(a, "item_id")); await UIAsync(() => main.SettingsVM.RefreshMemoryAsync()); await UI(() => main.ContentVM.InvalidateCache());
+                    _handles.TryRemove(S(a, "item_id"), out _); await UIAsync(() => main.SettingsVM.RefreshMemoryAsync()); await UI(() => main.ContentVM.InvalidateCache());
                     return ToolResult.Ok(name == "delete_content" ? "内容已移入回收站" : "内容状态已更新", new { name = item.Name });
                 }
                 case "import_content":
@@ -195,7 +200,7 @@ public sealed class LauncherOperations(MainViewModel main) : ILauncherOperations
                     var v = Resolve<VersionInfo>(S(a, "game_id")); var dir = DirectoryFor(v);
                     AgentPathGuard.Within(v.Root, Path.Combine(v.Root, "versions", v.Id));
                     await WriteAsync(dir, async () => { var service = new VersionManagementService(); if (name == "delete_game") await service.DeleteAsync(v, token); else { var next = await service.RenameAsync(v, S(a, "name"), token); await UI(() => { VersionManagementService.MoveSettings(main.Settings, v, next); if (main.CurrentVersion?.Id == v.Id) main.CurrentVersion = next; main.SettingsStore.Save(main.Settings); }); } });
-                    _handles.Remove(S(a, "game_id")); await UIAsync(() => main.VersionsVM.ScanVersionsAsync());
+                    _handles.TryRemove(S(a, "game_id"), out _); await UIAsync(() => main.VersionsVM.ScanVersionsAsync());
                     return ToolResult.Ok(name == "delete_game" ? "游戏已移入回收站" : "游戏已改名");
                 }
                 case "configure_memory":

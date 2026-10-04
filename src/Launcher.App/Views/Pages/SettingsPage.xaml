@@ -81,9 +81,10 @@
       </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
      </StackPanel></Border>
     </StackPanel>
-    <StackPanel x:Name="LaunchSection" Tag="Launch" Margin="0,0,0,24">
-     <TextBlock Text="启动" Style="{StaticResource SettingsSectionTitle}" />
+    <StackPanel x:Name="LaunchJavaSection" Tag="LaunchJava" Margin="0,0,0,24">
+     <TextBlock Text="启动与Java" Style="{StaticResource SettingsSectionTitle}" />
      <Border Style="{StaticResource AppleCard}"><StackPanel>
+    <StackPanel x:Name="LaunchSection">
       <DockPanel Margin="0,0,0,18"><CheckBox DockPanel.Dock="Right" IsChecked="{Binding SmartMemory,Mode=TwoWay}" Style="{StaticResource GlassSwitch}" AutomationProperties.Name="智能内存" VerticalAlignment="Center"/><TextBlock Text="智能内存" Style="{StaticResource SettingsRowLabel}"/></DockPanel>
       <Grid>
       <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="300"/></Grid.ColumnDefinitions>
@@ -93,14 +94,12 @@
        <TextBlock Text="{Binding AvailableMemoryLabel}" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right" Margin="0,8,0,0"/>
        <TextBlock Text="{Binding MemoryStatus}" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Right"/>
       </StackPanel>
-     </Grid></StackPanel></Border>
+     </Grid>
     </StackPanel>
-    <StackPanel x:Name="JavaSection" Tag="Java" Margin="0,0,0,24">
-     <DockPanel Margin="0,0,0,10">
-      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><Button Content="添加" Command="{Binding SelectManualJavaCommand}" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,8,0"/><Button Content="扫描" Command="{Binding ScanJavaCommand}" IsEnabled="{Binding IsScanningJava,Converter={StaticResource BoolToVis},ConverterParameter=Inverse}" Style="{StaticResource AppleSecondaryButton}"/></StackPanel>
-      <TextBlock Text="Java" Style="{StaticResource SettingsSectionTitle}" Margin="0" VerticalAlignment="Center"/>
-     </DockPanel>
-     <Border Style="{StaticResource AppleCard}"><StackPanel>
+    <Border Height="1" Background="{DynamicResource AppleCardBorderBrush}" Margin="0,20"/>
+    <StackPanel x:Name="JavaSection">
+     <DockPanel Margin="0,0,0,18" ToolTip="游戏安装时自动检测并补齐 Java；关闭后可手动扫描或下载。"><CheckBox x:Name="AutoPrepareJavaSwitch" DockPanel.Dock="Right" IsChecked="{Binding AutoPrepareJava,Mode=TwoWay}" Style="{StaticResource GlassSwitch}" AutomationProperties.Name="自动检测并下载Java" VerticalAlignment="Center"/><TextBlock Text="自动检测并下载Java" Style="{StaticResource SettingsRowLabel}"/></DockPanel>
+     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,18"><Button Content="添加Java" Command="{Binding SelectManualJavaCommand}" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,8,0"/><Button Content="扫描Java" Command="{Binding ScanJavaCommand}" IsEnabled="{Binding IsScanningJava,Converter={StaticResource BoolToVis},ConverterParameter=Inverse}" Style="{StaticResource AppleSecondaryButton}"/></StackPanel>
       <Grid Margin="0,0,0,18"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
        <TextBlock Text="下载目录" Style="{StaticResource SettingsRowLabel}"/>
        <TextBlock Grid.Column="1" Text="{Binding JavaDownloadDirectory}" ToolTip="{Binding JavaDownloadDirectory}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
@@ -132,11 +131,13 @@
         <Button Grid.Column="1" Content="选用" Click="SelectJava_Click" Tag="{Binding}" Style="{StaticResource AppleSecondaryButton}" VerticalAlignment="Center"/>
        </Grid></Border>
       </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+    </StackPanel>
      </StackPanel></Border>
     </StackPanel>
-    <StackPanel x:Name="DownloadsSection" Tag="Downloads" Margin="0,0,0,24">
-     <TextBlock Text="下载" Style="{StaticResource SettingsSectionTitle}"/>
+    <StackPanel x:Name="DownloadsDataSection" Tag="DownloadsData" Margin="0,0,0,24">
+     <TextBlock Text="下载与数据" Style="{StaticResource SettingsSectionTitle}"/>
      <Border Style="{StaticResource AppleCard}"><StackPanel>
+    <StackPanel x:Name="DownloadsSection">
       <DockPanel Margin="0,0,0,18"><CheckBox DockPanel.Dock="Right" IsChecked="{Binding PreferGameMirror}" Style="{StaticResource GlassSwitch}" VerticalAlignment="Center"/><TextBlock Text="游戏镜像 · BMCLAPI" Style="{StaticResource SettingsRowLabel}"/></DockPanel>
       <DockPanel Margin="0,0,0,18"><CheckBox DockPanel.Dock="Right" IsChecked="{Binding PreferContentMirror}" Style="{StaticResource GlassSwitch}" VerticalAlignment="Center"/><TextBlock Text="内容镜像 · MCIM" Style="{StaticResource SettingsRowLabel}"/></DockPanel>
       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -145,11 +146,9 @@
        <StackPanel Grid.Column="2" Orientation="Horizontal"><Button Content="保存" Click="SaveCurseForgeKeyClick" Style="{StaticResource AppleSecondaryButton}" Margin="0,0,8,0"/><Button Content="移除" Command="{Binding RemoveCurseForgeKeyCommand}" Style="{StaticResource AppleSecondaryButton}"/></StackPanel>
       </Grid>
       <TextBlock Text="{Binding CurseForgeKeyStatus}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" HorizontalAlignment="Right" Margin="0,8,0,0"/>
-     </StackPanel></Border>
     </StackPanel>
-    <StackPanel x:Name="DataSection" Tag="Data" Margin="0,0,0,24">
-     <TextBlock Text="数据" Style="{StaticResource SettingsSectionTitle}"/>
-     <Border Style="{StaticResource AppleCard}"><StackPanel>
+    <Border Height="1" Background="{DynamicResource AppleCardBorderBrush}" Margin="0,20"/>
+    <StackPanel x:Name="DataSection">
       <Grid Margin="0,0,0,18"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
        <TextBlock Text="保存位置" Style="{StaticResource SettingsRowLabel}"/>
        <TextBlock Grid.Column="1" Text="{Binding DataDirectory}" ToolTip="{Binding DataDirectory}" Foreground="{DynamicResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,12,0"/>
@@ -157,6 +156,7 @@
       </Grid>
       <DockPanel><Button DockPanel.Dock="Right" Content="导入 settings.json" Command="{Binding ImportSettingsCommand}" Style="{StaticResource AppleSecondaryButton}"/><TextBlock Text="配置" Style="{StaticResource SettingsRowLabel}"/></DockPanel>
       <TextBlock Text="{Binding DataStatus}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,12,0,0" Visibility="{Binding DataStatus,Converter={StaticResource BoolToVis}}"/>
+    </StackPanel>
      </StackPanel></Border>
     </StackPanel>
     <StackPanel x:Name="AiSection" Tag="AI" Margin="0,0,0,24">
@@ -165,15 +165,6 @@
       <Grid Margin="0,0,0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="DeepSeek API Key" Style="{StaticResource SettingsRowLabel}"/><StackPanel Grid.Column="1"><PasswordBox Style="{StaticResource ApplePasswordBox}" x:Name="SettingsAiKey" PasswordChanged="AiKeyChanged" IsEnabled="{Binding CanConfigure}" AutomationProperties.Name="DeepSeek API Key"/><TextBlock Text="{Binding ConnectionStatus}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,8,0,0"/><WrapPanel Margin="0,10,0,0"><Button Content="保存并测试" Style="{StaticResource AppleSecondaryButton}" IsEnabled="{Binding CanConfigure}" Click="SaveAiKeyClick" Margin="0,0,8,0"/><Button Content="刷新模型" Style="{StaticResource AppleSecondaryButton}" Command="{Binding RefreshModelsCommand}" IsEnabled="{Binding CanConfigure}" Margin="0,0,8,0"/><Button Content="移除" Style="{StaticResource AppleSecondaryButton}" Command="{Binding RemoveKeyCommand}" IsEnabled="{Binding CanConfigure}"/></WrapPanel></StackPanel></Grid>
       <Grid Margin="0,0,0,14"><Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="模型" Style="{StaticResource SettingsRowLabel}"/><ComboBox Grid.Column="1" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}" DisplayMemberPath="Name" IsEnabled="{Binding CanConfigure}"/></Grid>
       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="推理" Style="{StaticResource SettingsRowLabel}"/><ComboBox Grid.Column="1" ItemsSource="{Binding ReasoningLevels}" SelectedItem="{Binding ReasoningEffort}" IsEnabled="{Binding CanConfigure}"/></Grid>
-     </StackPanel></Border>
-    </StackPanel>
-    <StackPanel x:Name="AdvancedSection" Tag="Advanced">
-     <TextBlock Text="高级" Style="{StaticResource SettingsSectionTitle}"/>
-     <Border Style="{StaticResource AppleCard}"><StackPanel>
-      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition/></Grid.ColumnDefinitions>
-       <TextBlock Text="微软 Client ID" Style="{StaticResource SettingsRowLabel}"/>
-       <TextBox Grid.Column="1" Style="{StaticResource AppleTextBox}" Text="{Binding MicrosoftClientId,UpdateSourceTrigger=PropertyChanged}"/>
-      </Grid>
      </StackPanel></Border>
     </StackPanel>
    </StackPanel>

@@ -100,7 +100,7 @@ public sealed class ModpackUpdateTests : IDisposable
             using var http = new HttpClient(); using var log = new LogService(Path.Combine(_root, "logs"));
             var installer = new DownloadInstallService(new JavaService(http, log), new(), log, sourceFactory: (p, ct) => new(p, ct, new Handler(Server)), gameEngine: new FixtureEngine());
             var plan = new InstallPlan("我的整合包", Path.Combine(_root, "game"), null, null, null, null, null, null,
-                new(false, false), Path.Combine(_root, "runtime"), [new("fixture-java", 17, new(17, 0, 1), "x64", "fixture")], LocalArchive: packPath);
+                new(false, false), Path.Combine(_root, "runtime"), [], LocalArchive: packPath) { AutoPrepareJava = false };
             var queue = new DownloadTaskService(installer, _ => false);
             var observations = new List<DownloadTaskInfo>(); queue.Changed += p => { lock (observations) observations.Add(p); };
             var result = await queue.WaitAsync(queue.Enqueue(plan));
@@ -166,6 +166,7 @@ public sealed class ModpackUpdateTests : IDisposable
     {
         public Task<string> InstallAsync(GameInstallRequest request, Action<DownloadTaskState, string, FileDownloadProgress?> update, CancellationToken token)
         {
+            Assert.False(request.Plan.AutoPrepareJava); Assert.Null(request.Java);
             update(DownloadTaskState.Downloading, "第一批", new(100, 100, 100, []));
             update(DownloadTaskState.Installing, "处理加载器", null);
             update(DownloadTaskState.Downloading, "第二批", new(0, 1000, 100, []));

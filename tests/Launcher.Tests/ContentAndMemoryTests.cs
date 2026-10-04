@@ -107,9 +107,12 @@ public sealed class ContentAndMemoryTests : IDisposable
     {
         var store = new SettingsStore(_root); var settings = store.Load();
         Assert.Equal(MemoryAllocationMode.Smart, settings.MemoryAllocationMode); Assert.Equal(0, settings.WindowTransparencyPercent);
+        Assert.True(settings.AutoPrepareJava);
+        settings.AutoPrepareJava = false;
         settings.MemoryAllocationMode = MemoryAllocationMode.Manual; settings.WindowTransparencyPercent = 35; settings.JavaDownloadDirectory = Path.Combine(_root, "Java 自定义");
         store.Save(settings); var restored = store.Load();
         Assert.Equal(MemoryAllocationMode.Manual, restored.MemoryAllocationMode); Assert.Equal(35, restored.WindowTransparencyPercent); Assert.Equal(settings.JavaDownloadDirectory, restored.JavaDownloadDirectory);
+        Assert.False(restored.AutoPrepareJava);
     }
     [Fact] public async Task Custom_Java_Directory_Cleans_Failed_Download_And_Preserves_Installed_Files()
     {

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -11,7 +12,7 @@ public sealed class JavaService(HttpClient http, LogService log)
 {
     private readonly SemaphoreSlim _downloadGate = new(1);
     private readonly Dictionary<string, JavaRuntimeInfo> _recentDownloads = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, (DateTime Stamp, JavaRuntimeInfo Info)> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, (DateTime Stamp, JavaRuntimeInfo Info)> _cache = new(StringComparer.OrdinalIgnoreCase);
     public async Task<IReadOnlyList<JavaRuntimeInfo>> ScanAsync(string gameRoot, IEnumerable<string> overrides, CancellationToken token = default, string? downloadDirectory = null)
     {
         var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -109,6 +110,24 @@ public sealed class JavaService(HttpClient http, LogService log)
         if (manual is not null) return runtimes.FirstOrDefault(x => x.Path.Equals(manual, StringComparison.OrdinalIgnoreCase) && x.Architecture == "x64" && (required is null || x.Major == required));
         return required is null ? null : runtimes.Where(x => x.Major == required && x.Architecture == "x64").OrderByDescending(x => x.Version).FirstOrDefault();
     }
+    public async Task<JavaRuntimeInfo?> PrepareForInstallAsync(int major, InstallPlan plan, IProgress<JavaDownloadProgress> progress, CancellationToken token, string? gameRoot = null)
+    {
+        token.ThrowIfCancellationRequested();
+        var runtime = Select(plan.Javas, major);
+        if (runtime is null && plan.AutoPrepareJava)
+        {
+            // Queued plans can predate the initial scan or a preceding task's Java installation.
+            var installed = await Task.Run(() => ScanAsync(gameRoot ?? plan.Root, plan.Javas.Select(j => j.Path), token, plan.JavaDirectory), token).ConfigureAwait(false);
+            runtime = Select(installed, major);
+        }
+        if (runtime is not null) return runtime;
+        if (plan.AutoPrepareJava) return await DownloadAsync(major, progress, token, plan.JavaDirectory).ConfigureAwait(false);
+        // Vanilla, Fabric and the local OptiFine patcher do not execute Java during installation.
+        if (plan.Loader?.Loader is "Forge" or "NeoForge")
+            throw new InvalidOperationException($"安装 {plan.Loader.Loader} 需要 Java {major}，自动下载已关闭，请在“启动与Java”中扫描、添加或手动下载");
+        return null;
+    }
+
     public async Task<JavaRuntimeInfo> DownloadAsync(int major, IProgress<JavaDownloadProgress> progress, CancellationToken token, string? downloadDirectory = null)
     {
         await _downloadGate.WaitAsync(token).ConfigureAwait(false);
