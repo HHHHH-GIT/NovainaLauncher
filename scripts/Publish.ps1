@@ -37,7 +37,7 @@ function Copy-PublishedExecutable([string]$source, [string]$target) {
             throw
         }
         try { Remove-Item -LiteralPath $backup -ErrorAction Stop }
-        catch [IO.IOException] { Write-Warning "运行中的旧文件暂存于 $backup；新版本重启后生效。" }
+        catch [IO.IOException], [UnauthorizedAccessException] { Write-Warning "运行中的旧文件暂存于 $backup；新版本重启后生效。" }
     }
 }
 

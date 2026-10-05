@@ -17,6 +17,7 @@ using System.Windows.Input;
 
 namespace Launcher.Tests;
 
+[Collection("AppPaths")]
 public class UiRegressionTests
 {
     [Fact]
@@ -25,6 +26,7 @@ public class UiRegressionTests
         Exception? failure = null;
         var thread = new Thread(() =>
         {
+            var previousData = AppPaths.Data;
             try
             {
                 var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
@@ -35,6 +37,7 @@ public class UiRegressionTests
                 app.Resources["CurrentItemConverter"] = new CurrentItemConverter(); app.Resources["DanmakuActiveConverter"] = new DanmakuActiveConverter();
                 app.Resources["LoaderIconConverter"] = new LoaderIconConverter();
                 var directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ikun-ui-" + Guid.NewGuid());
+                AppPaths.ConfigureData(directory);
                 using var http = new HttpClient();
                 using var log = new LogService(directory);
                 var secrets = new SecretStore(directory);
@@ -131,7 +134,7 @@ public class UiRegressionTests
                 vm.SettingsVM.AddDanmakuRuleCommand.Execute(null);
                 var rule = vm.SettingsVM.DanmakuRules.Last(); rule.MatchIndex = 1; rule.Pattern = "["; rule.Enabled = true;
                 Assert.False(rule.Enabled); Assert.NotEmpty(rule.Error);
-                Assert.Equal(new[] { "Appearance", "Danmaku", "LaunchJava", "DownloadsData", "AI" }, SettingsViewModel.Sections.Select(x => x.Id));
+                Assert.Equal(new[] { "Appearance", "Danmaku", "LaunchJava", "DownloadsData" }, SettingsViewModel.Sections.Select(x => x.Id));
                 Assert.DoesNotContain(Descendants(settingsPage).OfType<TextBlock>(), text => text.Text == "微软 Client ID");
                 foreach (var sectionName in new[] { "LaunchJavaSection", "DownloadsDataSection" })
                 {
@@ -154,7 +157,7 @@ public class UiRegressionTests
                 vm.SettingsVM.NavigateSection("AI"); root.UpdateLayout();
                 Assert.False(vm.SettingsVM.HasPendingSection);
                 Assert.True(vm.SettingsVM.ScrollOffset > 0);
-                Assert.Equal("AI", vm.SettingsVM.SelectedSection);
+                Assert.Equal("DownloadsData", vm.SettingsVM.SelectedSection);
                 var scroll = vm.SettingsVM.ScrollOffset;
                 vm.ToggleSidebar(); root.UpdateLayout();
                 Assert.Same(settingsPage, Descendants(root).OfType<Launcher.App.Views.Pages.SettingsPage>().Single());
@@ -377,6 +380,7 @@ public class UiRegressionTests
                 window.Close();
             }
             catch (Exception ex) { failure = ex; }
+            finally { AppPaths.ConfigureData(previousData); }
         });
         thread.SetApartmentState(ApartmentState.STA); thread.Start();
         Assert.True(thread.Join(TimeSpan.FromSeconds(60)), "UI layout timed out");
@@ -387,7 +391,7 @@ public class UiRegressionTests
     {
         var page = vm.CurrentPage; var sidebar = vm.SidebarExpanded; var offset = vm.SettingsVM.ScrollOffset;
         MotionPolicy.Set(UiAnimationMode.Off);
-        vm.IsAiMode = true; Pump(); Layout();
+        vm.IsAiMode = true; WaitForUi(vm.ModeChangeTask); Pump(); Layout();
         Assert.False(vm.EffectiveSidebarExpanded); Assert.False(vm.TopNavigationVisible); Assert.Equal(sidebar, vm.SidebarExpanded);
         Assert.Equal(46, ((Border)window.FindName("TitleBar")).ActualHeight);
         Assert.Equal(Visibility.Collapsed, ((Grid)window.FindName("NormalSurface")).Visibility);
@@ -408,13 +412,47 @@ public class UiRegressionTests
         CheckAgentThemeMarkdownAndProgress();
         CheckGroupedTools();
         CheckContextAndComposerCommands();
+        CheckWorkbenchAndHistory();
         vm.RequestAccountLogin(); Layout(); Assert.False(vm.AiSurfaceVisible); Assert.True(vm.NormalSurfaceVisible); Assert.Equal("Accounts", vm.CurrentPage);
         vm.CompleteAccountLogin(); Layout(); Assert.Equal(page, vm.CurrentPage);
-        vm.IsAiMode = false; Pump(); Layout(); Assert.Equal(page, vm.CurrentPage); Assert.Equal(sidebar, vm.EffectiveSidebarExpanded);
+        vm.IsAiMode = false; WaitForUi(vm.ModeChangeTask); Pump(); Layout(); Assert.Equal(page, vm.CurrentPage); Assert.Equal(sidebar, vm.EffectiveSidebarExpanded);
         Assert.Equal(Visibility.Collapsed, ((FrameworkElement)window.FindName("AgentSurface")).Visibility);
         Assert.Equal(offset, vm.SettingsVM.ScrollOffset);
         vm.AgentVM.IsConfigured = false; vm.AgentVM.Timeline.Clear(); MotionPolicy.Set(UiAnimationMode.Calm);
         void Layout() { root.Measure(new Size(1080, 700)); root.Arrange(new Rect(0, 0, 1080, 700)); root.UpdateLayout(); }
+        void CheckWorkbenchAndHistory()
+        {
+            var agent = vm.AgentVM; var agentPage = (Launcher.App.Views.Pages.AgentPage)window.FindName("AgentSurface");
+            agent.OpenAiSettingsCommand.Execute(null); Layout(); Pump(); Layout();
+            Assert.True(agent.ShowAiSettings); Assert.Equal(Visibility.Collapsed, ((Grid)agentPage.FindName("ChatSurface")).Visibility);
+            Assert.Equal("设置", ((Button)agentPage.FindName("ConnectionButton")).Content);
+            vm.SettingsVM.Theme = "Dark"; Capture("AI-settings-dark"); vm.SettingsVM.Theme = "Light"; Capture("AI-settings-light");
+            agent.CloseAiSettingsCommand.Execute(null); WaitForUi(agent.NewConversationCommand.ExecuteAsync(null));
+            agent.Timeline.Add(new(new(AgentUiEventKind.User, "你", "基础模式会话记录")));
+            WaitForUi(agent.NewConversationCommand.ExecuteAsync(null)); Assert.Single(agent.Conversations.Where(x => x.Title == "基础模式会话记录"));
+            var basicEntry = agent.Conversations.Single(x => x.Title == "基础模式会话记录");
+            agent.ConfirmFullAccessCommand.Execute(null); Assert.False(agent.IsFullAccess);
+            agent.OpenFullAccessWarningCommand.Execute(null); Assert.True(agent.ShowFullAccessWarning); Assert.False(agent.IsFullAccess);
+            vm.SettingsVM.Theme = "Dark"; Capture("AI-full-access-warning-dark"); agent.CancelFullAccessCommand.Execute(null); Assert.False(agent.IsFullAccess);
+            agent.OpenFullAccessWarningCommand.Execute(null); agent.ConfirmFullAccessCommand.Execute(null); Assert.True(agent.IsFullAccess);
+            Layout(); Pump(); Layout(); Assert.Contains("授权", ((Button)agentPage.FindName("PermissionButton")).Content.ToString());
+            var automaticApproval = agent.ApproveAsync(new("夹具操作", "只验证策略，无文件操作"), CancellationToken.None); Assert.True(automaticApproval.IsCompletedSuccessfully && automaticApproval.Result);
+            agent.SelectedModeChoice = agent.ModeChoices.Single(x => x.Mode == AgentMode.Workbench); WaitUntilManaged();
+            Assert.False(agent.IsFullAccess);
+            Assert.True(agent.IsWorkbench); Assert.DoesNotContain(agent.Conversations, x => x.Mode == AgentMode.Basic);
+            agent.Timeline.Add(new(new(AgentUiEventKind.User, "你", "工作台独立会话记录")));
+            WaitForUi(agent.NewConversationCommand.ExecuteAsync(null)); Assert.Single(agent.Conversations);
+            foreach (var theme in new[] { "Dark", "Light" }) { vm.SettingsVM.Theme = theme; Capture("AI-workbench-" + theme.ToLowerInvariant()); }
+            agent.ToggleConversationSidebarCommand.Execute(null); Layout(); Assert.Equal(Visibility.Collapsed, ((Border)agentPage.FindName("ConversationSidebar")).Visibility);
+            agent.ToggleConversationSidebarCommand.Execute(null); Layout(); Assert.Equal(Visibility.Visible, ((Border)agentPage.FindName("ConversationSidebar")).Visibility);
+            agent.SelectedModeChoice = agent.ModeChoices.Single(x => x.Mode == AgentMode.Basic); WaitUntilManaged();
+            Assert.False(agent.IsWorkbench); Assert.DoesNotContain(agent.Conversations, x => x.Mode == AgentMode.Workbench);
+            if (agent.SelectedConversation?.Id != basicEntry.Id) { agent.SelectedConversation = basicEntry; WaitUntilManaged(); }
+            Assert.Contains(agent.Timeline, x => x.IsUser && x.Text == "基础模式会话记录");
+            Assert.All(agent.Timeline.Where(x => x.IsQuestion || x.IsApproval), x => Assert.False(x.CanRespond));
+            Assert.Equal(46, ((Border)window.FindName("TitleBar")).ActualHeight);
+            void WaitUntilManaged() { var until = DateTime.UtcNow.AddSeconds(6); do { Pump(); Thread.Sleep(5); } while (agent.IsManaging && DateTime.UtcNow < until); Assert.False(agent.IsManaging); }
+        }
         void Capture(string name)
         {
             Layout(); Pump(); Layout(); var image = new RenderTargetBitmap(1080, 700, 96, 96, PixelFormats.Pbgra32); image.Render(root);
@@ -470,6 +508,26 @@ public class UiRegressionTests
             Assert.Equal(Visibility.Visible, placeholder.Visibility);
             scroll.ScrollToEnd(); Layout(); Pump(); Capture("AI-question-scroll-bottom");
             vm.AgentVM.Timeline.Remove(tall);
+            var messages = Enumerable.Range(0, 90).Select(i => new AgentTimelineItem(new(AgentUiEventKind.Assistant, "DeepSeek", "## Message " + i + "\n\n" + string.Join("\n\n", Enumerable.Repeat("Variable-height message with inline **formatting** and text.", i % 7 + 1))))).ToArray();
+            foreach (var message in messages) vm.AgentVM.Timeline.Add(message);
+            Layout(); Pump(); Layout();
+            list.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseDownEvent });
+            scroll.ScrollToVerticalOffset(700); Layout(); Pump(); Layout();
+            MotionPolicy.Set(UiAnimationMode.Calm);
+            foreach (var delta in new[] { -120, -120, -120, 120, 120, 120 })
+            {
+                list.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice, 0, delta) { RoutedEvent = Mouse.PreviewMouseWheelEvent });
+                var previous = scroll.VerticalOffset;
+                var until = DateTime.UtcNow.AddMilliseconds(220);
+                while (DateTime.UtcNow < until)
+                {
+                    Pump(); Layout(); var current = scroll.VerticalOffset;
+                    Assert.True(delta < 0 ? current + .5 >= previous : current - .5 <= previous, $"Wheel offset reversed: {previous:F2} -> {current:F2}");
+                    previous = current; Thread.Sleep(4);
+                }
+            }
+            MotionPolicy.Set(UiAnimationMode.Off);
+            foreach (var message in messages) vm.AgentVM.Timeline.Remove(message);
         }
         void CheckContextAndComposerCommands()
         {
@@ -496,23 +554,50 @@ public class UiRegressionTests
             var current = vm.CurrentVersion; var account = vm.CurrentAccount;
             vm.AgentVM.Input = "@"; vm.AgentVM.UpdateSuggestions(1);
             var reference = Assert.Single(vm.AgentVM.Suggestions.Where(s => s.Reference?.Kind == "game").Take(1));
-            vm.AgentVM.AcceptSuggestionAsync(reference).GetAwaiter().GetResult();
+            WaitForUi(vm.AgentVM.AcceptSuggestionAsync(reference));
             Assert.Single(vm.AgentVM.DraftReferences); Assert.Contains("@「游戏：", vm.AgentVM.Input);
             Assert.Same(current, vm.CurrentVersion); Assert.Same(account, vm.CurrentAccount);
             vm.AgentVM.Input = ""; Assert.Empty(vm.AgentVM.DraftReferences);
-            vm.AgentVM.Input = "/goal 创建冒险整合包"; vm.AgentVM.TryExecuteLocalInputAsync().GetAwaiter().GetResult();
+            vm.AgentVM.Input = "/goal 创建冒险整合包"; WaitForUi(vm.AgentVM.TryExecuteLocalInputAsync());
             Assert.True(vm.AgentVM.ShowGoalEditor); Assert.Equal("创建冒险整合包", vm.AgentVM.GoalDraft);
             vm.AgentVM.CloseGoalCommand.Execute(null); vm.AgentVM.Input = ""; vm.AgentVM.ShowSuggestions = false;
             var usage = vm.AgentVM.ContextUsage;
             vm.AgentVM.ContextUsage = new(65000, 131072, [new("系统提示与工具定义", 4000), new("用户输入", 6000), new("模型输出与推理", 12000), new("工具调用与结果", 19000), new("日志内容", 15000), new("压缩摘要", 8000), new("目标与引用", 1000)]) { CapacityVerified = true, CompactionCount = 1, LastSavedTokens = 30000, LastInputTokens = 62000, LastOutputTokens = 3000 };
+            Assert.Equal(vm.AgentVM.ContextUsage.Percent, vm.AgentVM.ContextCategories.Sum(x => x.Percent), 6);
+            Assert.Equal(100, vm.AgentVM.ContextCategories.Sum(x => x.Percent) + vm.AgentVM.ContextRemainingPercent, 6);
+            Assert.Equal(66072, vm.AgentVM.ContextRemainingTokens);
+            Assert.Equal(7, vm.AgentVM.ContextCategories.Select(x => x.Color).Distinct().Count());
             foreach (var theme in new[] { "Light", "Dark" })
             {
                 vm.SettingsVM.Theme = theme; Capture("AI-context-composer-" + theme.ToLowerInvariant());
                 ring.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(); ((FrameworkElement)popup.Child).UpdateLayout();
                 Assert.Contains(Descendants(popup.Child).OfType<TextBlock>(), t => t.Text == "日志内容");
                 Assert.Contains(Descendants(popup.Child).OfType<TextBlock>(), t => t.Text == "15K");
+                Assert.Empty(Descendants(popup.Child).OfType<ProgressBar>());
+                var categoryBar = Assert.Single(Descendants(popup.Child).OfType<ContextUsageBar>());
+                Assert.Equal(vm.AgentVM.ContextUsage.Percent, categoryBar.Categories!.Sum(category => category.Percent), 6);
+                Assert.Equal(7, categoryBar.Categories!.Select(category => category.Color).Distinct().Count());
+                Assert.Contains(Descendants(popup.Child).OfType<TextBlock>(), t => t.Text == "剩余空间");
+                Assert.DoesNotContain(Descendants(popup.Child).OfType<TextBlock>(), t => t.Text == vm.AgentVM.ContextUsage.MeasurementNote);
+                Assert.Contains(Descendants(popup.Child).OfType<TextBlock>(), t => t.Text.Contains("随着对话轮次增加"));
                 if (theme == "Dark") Assert.True(((SolidColorBrush)((Border)popup.Child).Background).Color.G < 70);
+                var compactButton = (Button)agentPage.FindName("ContextCompactButton"); compactButton.ApplyTemplate();
+                Assert.Equal(new Thickness(1), ((Border)compactButton.Template.FindName("Surface", compactButton)).BorderThickness);
                 close.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                var usagePanel = (FrameworkElement)popup.Child; usagePanel.Opacity = 1;
+                usagePanel.Measure(new Size(360, 560)); usagePanel.Arrange(new Rect(usagePanel.DesiredSize)); usagePanel.UpdateLayout();
+                var usageImage = new RenderTargetBitmap((int)Math.Ceiling(usagePanel.ActualWidth), (int)Math.Ceiling(usagePanel.ActualHeight), 96, 96, PixelFormats.Pbgra32); usageImage.Render(usagePanel);
+                var usageEncoder = new PngBitmapEncoder(); usageEncoder.Frames.Add(BitmapFrame.Create(usageImage));
+                using (var output = System.IO.File.Create(System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "../../../../../artifacts/ui/AI-context-breakdown-" + theme.ToLowerInvariant() + ".png")))) usageEncoder.Save(output);
+                usagePanel.Opacity = 0;
+                foreach (var name in new[] { "ConnectionButton", "NewConversationButton" })
+                { var button = (Button)agentPage.FindName(name); button.ApplyTemplate(); Assert.Equal(new Thickness(1), ((Border)button.Template.FindName("Surface", button)).BorderThickness); }
+                vm.AgentVM.OpenGoalCommand.Execute(null); vm.AgentVM.GoalDraft = "为本次会话创建一个探索整合包。\n保留已选择的游戏版本与账户。"; Pump();
+                var goalInput = (TextBox)agentPage.FindName("GoalInput"); goalInput.ApplyTemplate();
+                var goalSurface = (Border)goalInput.Template.FindName("GoalInputSurface", goalInput);
+                Assert.Equal(new CornerRadius(12), goalSurface.CornerRadius);
+                if (theme == "Dark") Assert.True(((SolidColorBrush)goalSurface.Background).Color.G < 70);
+                Capture("AI-goal-input-" + theme.ToLowerInvariant()); vm.AgentVM.CloseGoalCommand.Execute(null);
                 vm.AgentVM.Input = "/"; vm.AgentVM.UpdateSuggestions(1); Pump();
                 var menu = (System.Windows.Controls.Primitives.Popup)agentPage.FindName("SuggestionsPopup");
                 ((FrameworkElement)menu.Child).UpdateLayout(); Assert.True(menu.IsOpen);
@@ -521,6 +606,11 @@ public class UiRegressionTests
                 vm.AgentVM.ShowSuggestions = false;
             }
             vm.AgentVM.ContextUsage = usage; vm.AgentVM.Input = "";
+            vm.AgentVM.Input = "/compact"; WaitForUi(vm.AgentVM.TryExecuteLocalInputAsync()); Pump();
+            Assert.True(vm.AgentVM.HasCompactionNotice); Assert.Contains("暂无需压缩", vm.AgentVM.CompactionNotice);
+            Assert.Equal(Visibility.Visible, ((Border)agentPage.FindName("CompactionFeedback")).Visibility);
+            Assert.Equal("就绪", vm.AgentVM.Status); // The notice survives the final idle status.
+            Capture("AI-compact-feedback-dark"); vm.AgentVM.DismissCompactionNoticeCommand.Execute(null); Assert.False(vm.AgentVM.HasCompactionNotice);
             Assert.Equal(46, ((Border)window.FindName("TitleBar")).ActualHeight);
             }
             finally { popupHost.Close(); }
@@ -537,7 +627,19 @@ public class UiRegressionTests
             Assert.Contains(text, x => x.Inlines.OfType<System.Windows.Documents.Bold>().Any());
             Assert.Single(text.SelectMany(x => x.Inlines.OfType<System.Windows.Documents.Hyperlink>()));
             Assert.DoesNotContain(Descendants(markdown), x => x is Image);
+            assistant.Text += "\n\n| 项目 | 结果 |\n|:---|---:|\n| 文件 | **已启用** `test.jar` |\n| 版本 | 1.20.1 |";
+            Layout(); Pump(); Layout();
+            var tableList = (ListBox)agentPage.FindName("TimelineList"); tableList.ScrollIntoView(assistant); Layout(); Pump(); Layout();
+            markdown = Descendants(agentPage).OfType<MarkdownText>().Single(x => x.Text == assistant.Text);
+            var table = Descendants(markdown).OfType<Grid>().Single(x => x.RowDefinitions.Count == 3 && x.ColumnDefinitions.Count == 2);
+            Assert.Equal(6, table.Children.Count);
+            var cellTexts = Descendants(table).OfType<TextBlock>().ToArray();
+            static string CellText(TextBlock block) => new System.Windows.Documents.TextRange(block.ContentStart, block.ContentEnd).Text.Trim();
+            Assert.True(cellTexts.Any(x => CellText(x) == "1.20.1"), "Table content: " + string.Join(" || ", cellTexts.Select(x => "[" + CellText(x) + "]")));
+            Assert.Equal(TextAlignment.Right, cellTexts.Single(x => CellText(x) == "1.20.1").TextAlignment);
+            Assert.DoesNotContain(Descendants(markdown).OfType<TextBlock>(), x => x.Text.Contains("|:---"));
             var outer = (ListBox)agentPage.FindName("TimelineList");
+            outer.ScrollIntoView(question); Layout(); Pump(); Layout();
             var options = Descendants(outer).OfType<ListBox>().Single();
             foreach (var theme in new[] { "Light", "Dark" })
             {

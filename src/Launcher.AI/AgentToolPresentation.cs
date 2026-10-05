@@ -20,6 +20,17 @@ public static class AgentToolPresentation
         "delete_content" => "删除内容", "delete_game" => "删除游戏", "rename_game" => "更改游戏名称",
         "configure_memory" => "配置内存", "configure_java" => "选择 Java", "download_java" => "准备 Java",
         "read_game_logs" => "读取游戏日志", "get_tasks" => "查询下载任务", "launch_game" => "启动游戏",
+        "get_development_guide" => "读取开发工作流", "inspect_workspace" => "检查项目与 JDK",
+        "list_mod_templates" => "查询官方 Mod 模板", "create_mod_project" => "初始化 Mod 项目",
+        "read_project_file" => "读取项目文件", "search_project" => "搜索项目源码",
+        "list_workspace_files" => "列出项目文件",
+        "list_dependency_sources" => "查询当前版本 API 源码", "read_dependency_source" => "读取依赖源码",
+        "write_project_file" => "保存项目文件", "delete_project_file" => "删除项目文件",
+        "run_terminal" => "运行开发终端", "list_build_artifacts" => "检查构建产物", "delegate_basic_agent" => "委托基础模式子代理",
+        "execute_terminal" => "执行终端命令", "set_working_directory" => "设置工作目录",
+        "list_files" => "查询文件目录", "read_file" => "读取文件", "write_file" => "保存文件",
+        "delete_path" => "删除文件或目录", "create_directory" => "创建目录", "move_path" => "移动路径", "copy_file" => "复制文件",
+        "import_modpack_file" => "导入整合包", "export_modpack_file" => "导出整合包",
         _ => "调用工具"
     };
 

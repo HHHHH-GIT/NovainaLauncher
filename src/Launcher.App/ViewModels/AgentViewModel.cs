@@ -9,7 +9,7 @@ namespace Launcher.App.ViewModels;
 public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
 {
     public MainViewModel Main { get; }
-    private readonly IAgentSessionService _session;
+    private AgentSessionService _session;
     private IDeepSeekClient _client;
     private string? _key;
     private CancellationTokenSource? _connection;
@@ -23,6 +23,16 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
     public ObservableCollection<AgentComposerReference> DraftReferences { get; } = new();
     [ObservableProperty] private AgentComposerSuggestion? _selectedSuggestion;
     [ObservableProperty] private AgentContextUsage _contextUsage = new(0, 131072, []);
+    [ObservableProperty] private string _compactionNotice = "";
+    public bool HasCompactionNotice => CompactionNotice.Length > 0;
+    public bool CanDismissCompactionNotice => !ContextUsage.IsCompacting && !(IsRunning && ContextUsage.CompactionPending);
+    public bool CanCompact => !IsStopping && !IsConnecting && IsConfigured && SelectedModel is not null && !ContextUsage.IsCompacting && !(IsRunning && ContextUsage.CompactionPending);
+    public IReadOnlyList<AgentContextCategoryView> ContextCategories => AgentContextCategoryView.Create(ContextUsage);
+    public long ContextRemainingTokens => Math.Max(0, (long)ContextUsage.Capacity - Math.Max(0, ContextUsage.Used));
+    public double ContextRemainingPercent => ContextUsage.Capacity > 0 ? 100d * ContextRemainingTokens / ContextUsage.Capacity : 0;
+    public string ContextRemainingTokenLabel => AgentContextUsage.FormatTokens(ContextRemainingTokens);
+    public string ContextRemainingPercentLabel => AgentContextCategoryView.FormatPercent(ContextRemainingPercent);
+    public string ContextUsageSummary => $"{(ContextUsage.IsEstimate ? "约 " : "")}{AgentContextUsage.FormatTokens(ContextUsage.Used)} / {AgentContextUsage.FormatTokens(ContextUsage.Capacity)} ({ContextUsage.Percent:F0}%)";
     [ObservableProperty] private bool _showSuggestions;
     [ObservableProperty] private bool _showGoalEditor;
     [ObservableProperty] private string _goalDraft = "";
@@ -42,44 +52,53 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
     [ObservableProperty] private bool _showConnection;
     [ObservableProperty] private string _reasoningEffort = "high";
     public IReadOnlyList<string> ReasoningLevels => SelectedModel?.Efforts is { Count: > 0 } levels ? levels : ["high", "medium", "low"];
-    public bool ShowWelcome => !IsConfigured || ShowConnection;
-    public bool CanConfigure => !IsRunning && !IsStopping && !IsConnecting;
-    public bool CanSend => !IsRunning && !IsStopping && !IsConnecting && IsConfigured && SelectedModel is not null && !string.IsNullOrWhiteSpace(Input);
+    public bool ShowWelcome => !ShowAiSettings && !IsManaging && (!IsConfigured || ShowConnection);
+    public bool CanConfigure => !IsRunning && !IsStopping && !IsConnecting && !IsManaging;
+    public bool CanSend => !IsRunning && !IsStopping && !IsConnecting && !IsManaging && IsConfigured && SelectedModel is not null && !string.IsNullOrWhiteSpace(Input);
     public event Action? TimelineChanged;
     public AgentViewModel(MainViewModel main)
     {
         Main = main;
-        _reasoningEffort = main.Settings.AiReasoningEffort;
+        _aiConfiguration = _aiConfigurationStore.Load(main.Settings);
+        _reasoningEffort = _aiConfiguration.ReasoningEffort;
+        _sidebarExpanded = _aiConfiguration.SidebarExpanded;
         try { _key = main.Secrets.ReadJson<string>("deepseek-api-key"); } catch { ConnectionStatus = "密钥读取失败，请重新配置"; }
         if (_key is { Length: > 0 }) { main.Log.RegisterSecret(_key); IsConfigured = true; ConnectionStatus = "已配置"; }
         _client = new DeepSeekClient(() => _key);
-        _session = new AgentSessionService(new ClientProxy(this), new AgentToolRegistry(main.Operations), main.Operations, this);
-        _session.Event += e => main.UiDispatcher.InvokeAsync(() => Receive(e));
-        if (main.Settings.AiModelId.Length > 0) { var saved = new AgentModel(main.Settings.AiModelId, main.Settings.AiModelId) { HasVerifiedContextWindow = false }; Models.Add(saved); _selectedModel = saved; _session.SetModel(saved); }
+        _session = CreateSession(AgentMode.Basic);
+        if (_aiConfiguration.ModelId.Length > 0) { var saved = new AgentModel(_aiConfiguration.ModelId, _aiConfiguration.ModelId) { HasVerifiedContextWindow = false }; Models.Add(saved); _selectedModel = saved; _session.SetModel(saved); }
         ContextUsage = _session.ContextUsage;
         DraftReferences.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasDraftReferences));
     }
     private sealed class ClientProxy(AgentViewModel vm) : IDeepSeekClient
     {
+        public Task<AgentResponse> RespondWithInstructionsAsync(AgentModel m, string effort, System.Text.Json.Nodes.JsonArray h, System.Text.Json.Nodes.JsonArray t, string instructions, Action<string> delta, CancellationToken c) => vm._client.RespondWithInstructionsAsync(m, effort, h, t, instructions, delta, c);
         public Task<IReadOnlyList<AgentModel>> GetModelsAsync(bool refresh, CancellationToken cancellation) => vm._client.GetModelsAsync(refresh, cancellation);
         public Task<AgentResponse> RespondAsync(AgentModel m, string effort, System.Text.Json.Nodes.JsonArray h, System.Text.Json.Nodes.JsonArray t, Action<string> delta, CancellationToken c) => vm._client.RespondAsync(m, effort, h, t, delta, c);
         public Task<AgentCompaction> CompactAsync(AgentModel m, string effort, System.Text.Json.Nodes.JsonArray h, CancellationToken c) => vm._client.CompactAsync(m, effort, h, c);
     }
     partial void OnSelectedModelChanged(AgentModel? value)
-    { if (value is null || IsRunning) return; _session.SetModel(value); Main.Settings.AiModelId = value.Id; Main.SettingsStore.Save(Main.Settings); OnPropertyChanged(nameof(ReasoningLevels)); if (!ReasoningLevels.Contains(ReasoningEffort)) ReasoningEffort = ReasoningLevels.Contains("high") ? "high" : ReasoningLevels[0]; Changed(); }
-    partial void OnReasoningEffortChanged(string value) { Main.Settings.AiReasoningEffort = value; Main.SettingsStore.Save(Main.Settings); }
+    { if (value is null || IsRunning) return; _session.SetModel(value); _aiConfiguration.ModelId = value.Id; _aiConfigurationStore.Save(_aiConfiguration); OnPropertyChanged(nameof(ReasoningLevels)); if (!ReasoningLevels.Contains(ReasoningEffort)) ReasoningEffort = ReasoningLevels.Contains("high") ? "high" : ReasoningLevels[0]; Changed(); }
+    partial void OnReasoningEffortChanged(string value) { _aiConfiguration.ReasoningEffort = value; _aiConfigurationStore.Save(_aiConfiguration); }
     partial void OnInputChanged(string value) { foreach (var item in DraftReferences.Where(x => !value.Contains(x.Token, StringComparison.Ordinal)).ToArray()) DraftReferences.Remove(item); Changed(); }
     partial void OnSessionGoalChanged(string value) => OnPropertyChanged(nameof(HasGoal));
+    partial void OnCompactionNoticeChanged(string value) => OnPropertyChanged(nameof(HasCompactionNotice));
+    partial void OnContextUsageChanged(AgentContextUsage value)
+    {
+        OnPropertyChanged(nameof(ContextCategories)); OnPropertyChanged(nameof(ContextRemainingTokens)); OnPropertyChanged(nameof(ContextRemainingPercent));
+        OnPropertyChanged(nameof(ContextRemainingTokenLabel)); OnPropertyChanged(nameof(ContextRemainingPercentLabel)); OnPropertyChanged(nameof(ContextUsageSummary));
+        OnPropertyChanged(nameof(CanCompact)); OnPropertyChanged(nameof(CanDismissCompactionNotice));
+    }
     partial void OnIsConfiguredChanged(bool value) { OnPropertyChanged(nameof(ShowWelcome)); Changed(); }
     partial void OnShowConnectionChanged(bool value) => OnPropertyChanged(nameof(ShowWelcome));
     partial void OnIsRunningChanged(bool value) => Changed();
     partial void OnIsStoppingChanged(bool value) => Changed();
     partial void OnIsConnectingChanged(bool value) => Changed();
-    private void Changed() { OnPropertyChanged(nameof(CanConfigure)); OnPropertyChanged(nameof(CanSend)); SendCommand.NotifyCanExecuteChanged(); }
+    private void Changed() { OnPropertyChanged(nameof(CanConfigure)); OnPropertyChanged(nameof(CanSend)); OnPropertyChanged(nameof(CanManageConversations)); OnPropertyChanged(nameof(CanCompact)); OnPropertyChanged(nameof(CanDismissCompactionNotice)); SendCommand.NotifyCanExecuteChanged(); }
     public async Task ModeChangedAsync(bool enabled)
     {
-        if (!enabled) { ShowSuggestions = false; ShowGoalEditor = false; await StopAsync(); Main.CompleteAccountLogin(); }
-        else if (IsConfigured) { _connectionTask = RefreshModelsCoreAsync(false); await _connectionTask; }
+        if (!enabled) { ShowSuggestions = false; ShowGoalEditor = false; ShowFullAccessWarning = false; await StopAsync(); await SaveCurrentConversationAsync(); _permissions.Reset(); _workbench?.Revoke(); PermissionChanged(); Main.CompleteAccountLogin(); }
+        else { await InitializeConversationsAsync(); if (IsConfigured) { _connectionTask = RefreshModelsCoreAsync(false); await _connectionTask; } }
     }
     [RelayCommand] private void OpenConnection() => ShowConnection = true;
     [RelayCommand] private void CloseConnection() { if (IsConfigured) ShowConnection = false; }
@@ -95,7 +114,7 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
             var candidate = new DeepSeekClient(() => key);
             var models = await candidate.GetModelsAsync(true, cts.Token); cts.Token.ThrowIfCancellationRequested();
             Main.Secrets.WriteJson("deepseek-api-key", key); Main.Log.RegisterSecret(key); _key = key; _client = candidate;
-            ApplyModels(models); IsConfigured = true; ShowConnection = false; Main.Settings.AiSetupCompleted = true; Main.SettingsStore.Save(Main.Settings); ConnectionStatus = "连接成功";
+            ApplyModels(models); IsConfigured = true; ShowConnection = false; _aiConfiguration.SetupCompleted = true; _aiConfigurationStore.Save(_aiConfiguration); ConnectionStatus = "连接成功";
         }
         catch (OperationCanceledException) { ConnectionStatus = "已取消"; }
         catch (Exception) { ConnectionStatus = "连接失败，请检查密钥与网络"; }
@@ -113,11 +132,11 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
     }
     private void ApplyModels(IReadOnlyList<AgentModel> models)
     {
-        var prior = Main.Settings.AiModelId; Models.Clear(); foreach (var m in models) Models.Add(m);
+        var prior = _aiConfiguration.ModelId; Models.Clear(); foreach (var m in models) Models.Add(m);
         SelectedModel = models.FirstOrDefault(m => m.Id == prior) ?? models.FirstOrDefault(m => m.Id.Contains("pro", StringComparison.OrdinalIgnoreCase)) ?? models.FirstOrDefault(m => m.Id.Contains("flash", StringComparison.OrdinalIgnoreCase)) ?? models[0];
     }
     [RelayCommand] private void RemoveKey()
-    { if (!CanConfigure) return; Main.Secrets.Delete("deepseek-api-key"); _key = null; PendingKey = ""; _client = new DeepSeekClient(() => _key); IsConfigured = false; Models.Clear(); SelectedModel = null; Main.Settings.AiSetupCompleted = false; Main.SettingsStore.Save(Main.Settings); ConnectionStatus = "未配置"; }
+    { if (!CanConfigure) return; Main.Secrets.Delete("deepseek-api-key"); _key = null; PendingKey = ""; _client = new DeepSeekClient(() => _key); IsConfigured = false; Models.Clear(); SelectedModel = null; _aiConfiguration.SetupCompleted = false; _aiConfigurationStore.Save(_aiConfiguration); ConnectionStatus = "未配置"; }
     [RelayCommand(CanExecute = nameof(CanSend))] private async Task SendAsync()
     {
         if (await TryExecuteLocalInputAsync()) return;
@@ -132,9 +151,9 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
     {
         if (SelectedModel is not { } model || !CanConfigure || !IsConfigured) return;
         IsRunning = true;
-        try { await _session.SendAsync(text, model, Main.Settings.AiReasoningEffort, references: references); }
+        try { await _session.SendAsync(text, model, _aiConfiguration.ReasoningEffort, references: references); }
         catch (Exception e) when (e is ArgumentException or InvalidOperationException) { Status = e.Message; }
-        finally { IsRunning = false; }
+        finally { IsRunning = false; await SaveCurrentConversationAsync(); }
     }
     public void UpdateSuggestions(int caret)
     {
@@ -173,12 +192,14 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
     }
     [RelayCommand] private async Task CompactAsync()
     {
-        if (SelectedModel is not { } model || !IsConfigured) { Status = "请先连接模型"; return; }
+        if (SelectedModel is not { } model || !IsConfigured) { Status = CompactionNotice = "请先连接模型，再压缩上下文。"; return; }
+        if (ContextUsage.IsCompacting || (IsRunning && ContextUsage.CompactionPending)) return;
         if (IsRunning) { _session.RequestCompaction(); Status = "将在当前操作完整结束后压缩"; return; }
         if (!CanConfigure) return;
         IsRunning = true;
-        try { await _session.CompactAsync(model, ReasoningEffort); } finally { IsRunning = false; }
+        try { await _session.CompactAsync(model, ReasoningEffort); } finally { IsRunning = false; await SaveCurrentConversationAsync(); }
     }
+    [RelayCommand] private void DismissCompactionNotice() { if (CanDismissCompactionNotice) CompactionNotice = ""; }
     [RelayCommand] private void OpenGoal()
     { if (!CanConfigure) { Status = "请先停止执行再修改目标"; return; } GoalDraft = SessionGoal; ShowGoalEditor = true; }
     [RelayCommand] private void CloseGoal() => ShowGoalEditor = false;
@@ -194,16 +215,17 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
     [RelayCommand] private Task StopAsync() => _stopTask is { IsCompleted: false } existing ? existing : _stopTask = StopCoreAsync();
     private async Task StopCoreAsync()
     {
-        IsStopping = true; _connection?.Cancel();
-        try { await _session.StopAsync(); if (_connectionTask is { } connect) await connect; }
+        IsStopping = true; _connection?.Cancel(); _managementInteraction?.Cancel();
+        try { await _session.StopAsync(); if (_connectionTask is { } connect) await connect; if (_managementInteractionTask is { IsCompleted: false } ui) await ui; }
         finally { IsStopping = false; IsRunning = false; Status = "就绪"; }
     }
-    public Task CancelAndWaitAsync() => StopAsync();
-    [RelayCommand] private async Task NewConversationAsync() { await StopAsync(); _session.Clear(); Main.Operations.ResetHandles(); _toolItems.Clear(); Timeline.Clear(); Input = ""; SessionGoal = ""; GoalDraft = ""; ShowGoalEditor = false; ShowSuggestions = false; TimelineChanged?.Invoke(); }
+    public async Task CancelAndWaitAsync() { await StopAsync(); await SaveCurrentConversationAsync(); }
+    [RelayCommand] private Task NewConversationAsync() => CreateConversationAsync();
     [RelayCommand] private void Suggest(string text) => Input = text;
     private void Receive(AgentUiEvent e)
     {
         if (e.Kind == AgentUiEventKind.Context) { if (e.ContextUsage is not null) ContextUsage = e.ContextUsage; return; }
+        if (e.Kind == AgentUiEventKind.Compaction) { CompactionNotice = e.Title + (e.Text.Length > 0 ? "\n" + e.Text : ""); Status = e.Title; return; }
         if (e.ToolCallId is { } callId)
         {
             if (e.Kind == AgentUiEventKind.ToolStarted)
@@ -252,6 +274,8 @@ public sealed partial class AgentViewModel : ViewModelBase, IAgentInteraction
     }
     public async Task<bool> ApproveAsync(AgentApproval approval, CancellationToken cancellation)
     {
+        cancellation.ThrowIfCancellationRequested();
+        if (IsFullAccess) return true;
         var source = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously); AgentTimelineItem? card = null;
         await Main.UiDispatcher.InvokeAsync(() => { Status = "等待确认"; card = new(new(AgentUiEventKind.Approval, approval.Title, approval.Detail)); card.Confirm = approved => source.TrySetResult(approved); Timeline.Add(card); TimelineChanged?.Invoke(); });
         try { return await source.Task.WaitAsync(cancellation); }

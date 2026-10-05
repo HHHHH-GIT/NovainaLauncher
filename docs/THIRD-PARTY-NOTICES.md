@@ -2,6 +2,8 @@
 
 本次保留当前 CmlLib.Core 4.0.6；新增依赖均固定版本。
 
+AI 工作台的九篇内置开发指南为原创整理，引用的官方技术文档与链接保留原权利，不复制完整上游文章。运行时获取的 Fabric 示例、Forge MDK、NeoForge MDKs 与 Gradle Wrapper 存于用户授权项目，不内嵌到启动器；初始化保留各模板 LICENSE/NOTICE，生成项目及依赖仍遵循各自许可。源码处理、ZIP 解包、进程管理使用 .NET API，本次没有增加终端/Agent 框架 NuGet 依赖。
+
 项目原创代码采用根目录 [MIT LICENSE](../LICENSE)。下列上游代码、库和素材保留各自许可，项目 LICENSE 不覆盖这些独立权利。相关 LICENSE/NOTICE 在 `src` 的 ThirdParty 子目录保留，并内嵌到单文件 EXE。
 
 | 依赖 | 版本 | 许可 |

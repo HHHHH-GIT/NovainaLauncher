@@ -11,6 +11,7 @@ using Launcher.Core;
 using Xunit;
 
 namespace Launcher.Tests;
+[Collection("AppPaths")]
 public sealed class DownloadRefactorTests
 {
     [Fact] public void Local_Mod_Facets_Clean_Duplicates_And_Link_Game_Loader_And_File()

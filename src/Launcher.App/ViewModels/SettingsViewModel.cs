@@ -22,7 +22,7 @@ public sealed partial class SettingsViewModel : ViewModelBase, IDisposable
         if (DownloadAdoptiumJavaCommand.ExecutionTask is { } task) await task;
     }
     public void Dispose() { _memoryLifetime.Cancel(); _downloadCts?.Cancel(); if (_saveTimer.IsEnabled) { _saveTimer.Stop(); Main.SettingsStore.Save(Main.Settings); } }
-    public static IReadOnlyList<SettingsSection> Sections { get; } = [new("Appearance", "外观与动画"), new("Danmaku", "弹幕"), new("LaunchJava", "启动与Java"), new("DownloadsData", "下载与数据"), new("AI", "AI")];
+    public static IReadOnlyList<SettingsSection> Sections { get; } = [new("Appearance", "外观与动画"), new("Danmaku", "弹幕"), new("LaunchJava", "启动与Java"), new("DownloadsData", "下载与数据")];
     [ObservableProperty] private string _selectedSection = "Appearance";
     public double ScrollOffset { get; set; }
     public bool HasPendingSection { get; set; }

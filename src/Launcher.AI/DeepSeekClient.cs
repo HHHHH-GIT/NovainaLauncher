@@ -38,6 +38,8 @@ public sealed class DeepSeekClient(Func<string?> keyProvider, HttpClient? modelH
     }
     public Task<AgentResponse> RespondAsync(AgentModel model, string effort, JsonArray history, JsonArray tools, Action<string> textDelta, CancellationToken cancellation)
         => RespondCoreAsync(model, effort, history, tools, AgentPrompt.System, 16384, textDelta, cancellation);
+    public Task<AgentResponse> RespondWithInstructionsAsync(AgentModel model, string effort, JsonArray history, JsonArray tools, string instructions, Action<string> textDelta, CancellationToken cancellation)
+        => RespondCoreAsync(model, effort, history, tools, instructions, 16384, textDelta, cancellation);
     public async Task<AgentCompaction> CompactAsync(AgentModel model, string effort, JsonArray history, CancellationToken cancellation)
     {
         var response = await RespondCoreAsync(model, effort, history, [], AgentPrompt.Compaction, 8192, _ => { }, cancellation).ConfigureAwait(false);

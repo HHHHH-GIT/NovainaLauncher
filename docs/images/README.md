@@ -4,6 +4,8 @@
 | --- | --- |
 | `hero.jpg` | 原创品牌宣传片关键帧，只有 Novaina 图标与文案 |
 | `ai.png` | 实际 WPF 页面离屏渲染，演示问题，无真实账户或 API Key |
+| `ai-workbench-dark.png` | 实际工作台 WPF 页面离屏渲染，演示会话，无真实账户或 API Key |
+| `ai-settings-dark.png` | 实际独立 AI 设置页 WPF 离屏渲染，密钥为空 |
 | `downloads.png` | 实际 WPF 下载 Welcome 页离屏渲染 |
 | `skins.png` | 宣传片 HTML/skinview3d 功能示意，默认 Steve，不是真实账户录屏 |
 | `startup.gif` | 实际 WPF 开场动画的桌面采样 |

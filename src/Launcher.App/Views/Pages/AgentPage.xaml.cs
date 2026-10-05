@@ -18,17 +18,19 @@ public partial class AgentPage : UserControl
     private bool _followTail = true;
     private bool _scrollAnimating;
     private bool _timelineUpdatePending;
-    private double _scrollTarget;
+    private readonly DispatcherTimer _scrollTimer;
+    private double _scrollDistance, _scrollConsumed;
+    private long _scrollStarted;
+    private int _scrollDuration;
     private object? _lastTimelineItem;
     private bool _contextPinned;
     private Window? _hostWindow;
     private ScrollViewer? TimelineScroll => TimelineList.Template?.FindName("PART_ScrollViewer", TimelineList) as ScrollViewer;
-    private static readonly DependencyProperty TimelineOffsetProperty = DependencyProperty.Register(
-        "TimelineOffset", typeof(double), typeof(AgentPage), new PropertyMetadata(0d, (d, e) =>
-            ((AgentPage)d).TimelineScroll?.ScrollToVerticalOffset((double)e.NewValue)));
     public AgentPage()
     {
         InitializeComponent();
+        _scrollTimer = new DispatcherTimer(DispatcherPriority.Input, Dispatcher) { Interval = TimeSpan.FromMilliseconds(16) };
+        _scrollTimer.Tick += ScrollFrame;
         TextCompositionManager.AddPreviewTextInputStartHandler(Composer, ComposerCompositionStarted);
         TextCompositionManager.AddPreviewTextInputUpdateHandler(Composer, ComposerCompositionStarted);
         Composer.AddHandler(TextCompositionManager.TextInputEvent, new TextCompositionEventHandler(ComposerCompositionCompleted), true);
@@ -60,8 +62,7 @@ public partial class AgentPage : UserControl
             var added = !ReferenceEquals(last, _lastTimelineItem);
             _lastTimelineItem = last;
             if (!_followTail || TimelineScroll is not { } scroll) return;
-            StopTimelineScroll();
-            TimelineList.UpdateLayout();
+            if (_scrollAnimating) return; // Never interrupt a user's wheel gesture for a streamed delta.
             if (added && last is AgentTimelineItem { IsQuestion: true })
             {
                 // A question can be taller than the viewport. Reveal its beginning, not its end.
@@ -86,22 +87,30 @@ public partial class AgentPage : UserControl
         // Handle on the outer list so option lists cannot consume the wheel or trap the card.
         e.Handled = true;
         var distance = SystemParameters.WheelScrollLines < 0 ? scroll.ViewportHeight : Math.Max(1, SystemParameters.WheelScrollLines) * 24d;
-        var target = Math.Clamp((_scrollAnimating ? _scrollTarget : scroll.VerticalOffset) - e.Delta / 120d * distance, 0, scroll.ScrollableHeight);
-        StopTimelineScroll(); _scrollTarget = target; _followTail = scroll.ScrollableHeight - target < 24;
+        var movement = -e.Delta / 120d * distance;
+        var target = Math.Clamp(scroll.VerticalOffset + (_scrollDistance - _scrollConsumed) + movement, 0, scroll.ScrollableHeight);
+        _followTail = movement > 0 && scroll.ScrollableHeight - target < 24;
         var duration = MotionPolicy.Effective switch { UiAnimationMode.Calm => 180, UiAnimationMode.Performance => 110, _ => 0 };
-        if (duration == 0) { scroll.ScrollToVerticalOffset(target); return; }
-        SetValue(TimelineOffsetProperty, scroll.VerticalOffset); _scrollAnimating = true;
-        var animation = new DoubleAnimation(scroll.VerticalOffset, target, TimeSpan.FromMilliseconds(duration))
-        { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }, FillBehavior = FillBehavior.Stop };
-        animation.Completed += (_, _) => { SetValue(TimelineOffsetProperty, target); _scrollAnimating = false; };
-        BeginAnimation(TimelineOffsetProperty, animation, HandoffBehavior.SnapshotAndReplace);
+        if (duration == 0) { StopTimelineScroll(); scroll.ScrollToVerticalOffset(target); return; }
+        _scrollDistance = target - scroll.VerticalOffset; _scrollConsumed = 0; _scrollStarted = Environment.TickCount64; _scrollDuration = duration;
+        _scrollAnimating = true; _scrollTimer.Start();
+    }
+    private void ScrollFrame(object? sender, EventArgs e)
+    {
+        if (TimelineScroll is not { } scroll) { StopTimelineScroll(); return; }
+        var progress = Math.Clamp((Environment.TickCount64 - _scrollStarted) / (double)_scrollDuration, 0, 1);
+        var consumed = _scrollDistance * (1 - Math.Pow(1 - progress, 3));
+        var step = consumed - _scrollConsumed; _scrollConsumed = consumed;
+        // Relative movement keeps the virtualizer's current anchor when measured row
+        // heights change. Animating an absolute estimated offset repeatedly reset it.
+        scroll.ScrollToVerticalOffset(Math.Clamp(scroll.VerticalOffset + step, 0, scroll.ScrollableHeight));
+        if (progress >= 1) StopTimelineScroll();
     }
     private void StopTimelineScroll()
     {
-        var offset = TimelineScroll?.VerticalOffset ?? 0;
-        BeginAnimation(TimelineOffsetProperty, null); SetValue(TimelineOffsetProperty, offset); _scrollAnimating = false;
+        _scrollTimer.Stop(); _scrollDistance = _scrollConsumed = 0; _scrollAnimating = false;
     }
-    private void TimelineMouseDown(object sender, MouseButtonEventArgs e) => StopTimelineScroll();
+    private void TimelineMouseDown(object sender, MouseButtonEventArgs e) { StopTimelineScroll(); _followTail = false; }
     private void MotionChanged() { FinishIntro(); StopTimelineScroll(); }
     private void ComposerCompositionStarted(object sender, TextCompositionEventArgs e) { _isComposing = true; if (_vm is not null) _vm.ShowSuggestions = false; UpdatePlaceholder(); }
     private void ComposerCompositionCompleted(object sender, TextCompositionEventArgs e)
@@ -157,13 +166,15 @@ public partial class AgentPage : UserControl
         return false;
     }
     private void ContextRingEntered(object sender, MouseEventArgs e) => ContextPopup.IsOpen = true;
+    private void PermissionClicked(object sender, RoutedEventArgs e) => PermissionPopup.IsOpen = !PermissionPopup.IsOpen;
     private void ContextRingLeft(object sender, MouseEventArgs e) { if (!_contextPinned) ContextPopup.IsOpen = false; }
     private void ContextRingClicked(object sender, RoutedEventArgs e) { _contextPinned = true; ContextPopup.IsOpen = true; }
     private void ContextPopupClosed(object sender, RoutedEventArgs e) { _contextPinned = false; ContextPopup.IsOpen = false; }
-    private void CloseFloatingPanels() { _contextPinned = false; if (ContextPopup is not null) ContextPopup.IsOpen = false; if (_vm is not null) _vm.ShowSuggestions = false; }
+    private void CloseFloatingPanels() { _contextPinned = false; if (ContextPopup is not null) ContextPopup.IsOpen = false; if (PermissionPopup is not null) PermissionPopup.IsOpen = false; if (_vm is not null) _vm.ShowSuggestions = false; }
     private void HostStateChanged(object? sender, EventArgs e) { if (_hostWindow?.WindowState == WindowState.Minimized) CloseFloatingPanels(); }
     private void ViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(AgentViewModel.IsFullAccess) or nameof(AgentViewModel.ShowFullAccessWarning)) PermissionPopup.IsOpen = false;
         if (e.PropertyName == nameof(AgentViewModel.ShowWelcome) && _vm?.ShowWelcome == true) CloseFloatingPanels();
         if (e.PropertyName == nameof(AgentViewModel.ShowGoalEditor) && _vm?.ShowGoalEditor == true) { CloseFloatingPanels(); Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => GoalInput.Focus())); }
     }

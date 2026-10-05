@@ -17,7 +17,7 @@ public sealed record ToolResult(bool Success, string Summary, object? Data = nul
 public sealed record AgentOption(string Label, string Description, bool Recommended = false);
 public sealed record AgentQuestion(string Id, string Prompt, IReadOnlyList<AgentOption> Options);
 public sealed record AgentApproval(string Title, string Detail);
-public enum AgentUiEventKind { User, Assistant, Status, Operation, Question, Approval, Error, Interrupted, ToolStarted, ToolCompleted, Context }
+public enum AgentUiEventKind { User, Assistant, Status, Operation, Question, Approval, Error, Interrupted, ToolStarted, ToolCompleted, Context, Compaction }
 public enum AgentToolState { Running, Completed, Failed, Cancelled }
 public sealed record AgentUiEvent(AgentUiEventKind Kind, string Title, string Text = "", string? Id = null, double? Percent = null, string? Detail = null)
 {
@@ -29,16 +29,20 @@ public sealed record AgentUiEvent(AgentUiEventKind Kind, string Title, string Te
 
 public interface IDeepSeekClient
 {
+    Task<AgentResponse> RespondWithInstructionsAsync(AgentModel model, string effort, JsonArray history, JsonArray tools, string instructions, Action<string> textDelta, CancellationToken cancellation)
+        => RespondAsync(model, effort, history, tools, textDelta, cancellation);
     Task<IReadOnlyList<AgentModel>> GetModelsAsync(bool refresh, CancellationToken cancellation);
     Task<AgentResponse> RespondAsync(AgentModel model, string effort, JsonArray history, JsonArray tools, Action<string> textDelta, CancellationToken cancellation);
     Task<AgentCompaction> CompactAsync(AgentModel model, string effort, JsonArray history, CancellationToken cancellation) => throw new NotSupportedException("此客户端不支持上下文压缩");
 }
 public interface IAgentInteraction
 {
+    bool FullAccess => false;
     Task<IReadOnlyDictionary<string, string>> AskAsync(IReadOnlyList<AgentQuestion> questions, CancellationToken cancellation);
     Task<bool> ApproveAsync(AgentApproval approval, CancellationToken cancellation);
 }
-public sealed record AgentExecutionContext(Guid GroupId, IAgentInteraction Interaction, Action<AgentUiEvent> Emit, CancellationToken Cancellation);
+public sealed record AgentExecutionContext(Guid GroupId, IAgentInteraction Interaction, Action<AgentUiEvent> Emit, CancellationToken Cancellation)
+{ public AgentModelBudget? ModelBudget { get; init; } }
 public interface ILauncherOperations
 {
     IReadOnlyList<AgentReference> GetReferences() => [];

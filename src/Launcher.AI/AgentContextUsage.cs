@@ -32,10 +32,10 @@ public static class AgentContextAccounting
     public const string SummaryPrefix = "【压缩的会话摘要】";
     public const string PinnedPrefix = "【当前会话目标与引用】";
     public static long Estimate(string text) => (long)Math.Ceiling(text.Count(c => c > 127) * 1.5 + text.Count(c => c <= 127) / 3d) + 16;
-    public static long[] Measure(JsonArray history, JsonArray tools)
+    public static long[] Measure(JsonArray history, JsonArray tools, string instructions = AgentPrompt.System)
     {
         var totals = new long[7];
-        totals[0] = Estimate(AgentPrompt.System) + Estimate(tools.ToJsonString());
+        totals[0] = Estimate(instructions) + Estimate(tools.ToJsonString());
         var calls = history.OfType<JsonObject>().Where(x => x["type"]?.ToString() == "function_call")
             .GroupBy(x => x["call_id"]!.ToString()).ToDictionary(g => g.Key, g => g.Last()["name"]?.ToString());
         foreach (var item in history.OfType<JsonObject>())

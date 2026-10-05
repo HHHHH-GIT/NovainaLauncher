@@ -2,12 +2,22 @@
  xmlns:vm="clr-namespace:Launcher.App.ViewModels" xmlns:motion="clr-namespace:Launcher.App.Controls">
  <Style x:Key="AiQuietButton" TargetType="Button" BasedOn="{StaticResource AppleSecondaryButton}">
   <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="10,4"/>
-  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="10" BorderThickness="1" BorderBrush="Transparent"><ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="10" BorderThickness="{TemplateBinding BorderThickness}" BorderBrush="{TemplateBinding BorderBrush}"><ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers>
    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource AppleSubtleHoverBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Trigger>
-   <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource AiAccentBrush}"/></Trigger>
+   <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource AiAccentBrush}"/><Setter TargetName="Surface" Property="BorderThickness" Value="1"/></Trigger>
    <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.7"/></Trigger>
    <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
   </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+ </Style>
+ <Style x:Key="AiOutlinedButton" TargetType="Button" BasedOn="{StaticResource AiQuietButton}">
+  <Setter Property="BorderThickness" Value="1"/><Setter Property="BorderBrush" Value="{DynamicResource AppleCardBorderBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/><Setter Property="Padding" Value="12,4"/>
+ </Style>
+ <Style x:Key="AiGoalInput" TargetType="TextBox" BasedOn="{StaticResource AppleTextBox}">
+  <Setter Property="Height" Value="Auto"/><Setter Property="Padding" Value="12,10"/><Setter Property="VerticalContentAlignment" Value="Top"/><Setter Property="CaretBrush" Value="{DynamicResource TextPrimaryBrush}"/><Setter Property="SelectionBrush" Value="{StaticResource AiAccentBrush}"/><Setter Property="SelectionOpacity" Value="0.25"/>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
+   <Border x:Name="GoalInputSurface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12"><ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/></Border>
+   <ControlTemplate.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="GoalInputSurface" Property="BorderBrush" Value="{StaticResource AiAccentBrush}"/><Setter TargetName="GoalInputSurface" Property="Background" Value="{DynamicResource InputFocusBrush}"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55"/></Trigger></ControlTemplate.Triggers>
+  </ControlTemplate></Setter.Value></Setter>
  </Style>
  <Style x:Key="AiActionButton" TargetType="Button" BasedOn="{StaticResource ApplePrimaryButton}"><Setter Property="Background" Value="{StaticResource AiAccentBrush}"/></Style>
  <Style x:Key="AiDisclosure" TargetType="Expander">

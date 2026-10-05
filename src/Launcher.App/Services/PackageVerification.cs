@@ -9,6 +9,7 @@ using Launcher.App.Views;
 using Launcher.Core;
 using SkiaSharp;
 using Microsoft.Web.WebView2.Core;
+using Launcher.AI;
 
 namespace Launcher.App.Services;
 
@@ -44,9 +45,17 @@ public static class PackageVerification
                 vm.Navigate(page); visual.Measure(new Size(1080, 700)); visual.Arrange(new Rect(0, 0, 1080, 700)); visual.UpdateLayout();
                 var bitmap = new RenderTargetBitmap(1080, 700, 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual);
             }
+            var guides = new[] { "workflow", "fabric", "forge", "neoforge", "resources", "sides-network", "testing", "troubleshooting", "delivery" };
+            if (guides.Any(topic => ModDevelopmentGuides.Read(topic).Length < 400)) throw new InvalidDataException("缺少内嵌 Mod 开发指南");
+            var aiSettings = new Views.Pages.AiSettingsPage { DataContext = vm.AgentVM };
+            aiSettings.Measure(new Size(860, 650)); aiSettings.Arrange(new Rect(0, 0, 860, 650)); aiSettings.UpdateLayout();
+            var aiBitmap = new RenderTargetBitmap(860, 650, 96, 96, PixelFormats.Pbgra32); aiBitmap.Render(aiSettings);
+            var conversationStore = new AgentConversationStore(root); var conversationId = Guid.NewGuid();
+            conversationStore.Save(new(new(conversationId, AgentMode.Workbench, "发布检查", DateTimeOffset.UtcNow), new(new(), "检查", [], 0), []));
+            if (conversationStore.Load(AgentMode.Workbench, conversationId)?.Session.Goal != "检查" || conversationStore.List(AgentMode.Basic).Count > 0) throw new InvalidDataException("会话存储或模式隔离异常");
             var avatar = await vm.Skins.GetCachedAsync(null);
             if (!File.Exists(vm.Skins.HeadFile(avatar))) throw new InvalidDataException("默认头像不可用");
-            Console.WriteLine(JsonSerializer.Serialize(new { success = true, title = window.Title, runtime = Environment.Version.ToString(), webViewRuntime, pages = 4, assets = files.Length, licenses = licenses.Length, skin = "Steve", executable = Environment.ProcessPath, baseDirectory = AppContext.BaseDirectory }));
+            Console.WriteLine(JsonSerializer.Serialize(new { success = true, title = window.Title, runtime = Environment.Version.ToString(), webViewRuntime, pages = 4, aiSettings = true, embeddedGuides = guides.Length, encryptedConversations = true, assets = files.Length, licenses = licenses.Length, skin = "Steve", executable = Environment.ProcessPath, baseDirectory = AppContext.BaseDirectory }));
             return 0;
         }
         catch (Exception error) { Console.WriteLine(JsonSerializer.Serialize(new { success = false, error = error.ToString() })); return 1; }

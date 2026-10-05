@@ -221,7 +221,6 @@
                                     <RadioButton Content="弹幕" Style="{StaticResource SettingsSubNav}" Command="{Binding SettingsVM.NavigateSectionCommand}" CommandParameter="Danmaku" IsChecked="{Binding SettingsVM.SelectedSection,Mode=OneWay,Converter={StaticResource EqualConverter},ConverterParameter=Danmaku}" />
                                     <RadioButton Content="启动与Java" Style="{StaticResource SettingsSubNav}" Command="{Binding SettingsVM.NavigateSectionCommand}" CommandParameter="LaunchJava" IsChecked="{Binding SettingsVM.SelectedSection,Mode=OneWay,Converter={StaticResource EqualConverter},ConverterParameter=LaunchJava}" />
                                     <RadioButton Content="下载与数据" Style="{StaticResource SettingsSubNav}" Command="{Binding SettingsVM.NavigateSectionCommand}" CommandParameter="DownloadsData" IsChecked="{Binding SettingsVM.SelectedSection,Mode=OneWay,Converter={StaticResource EqualConverter},ConverterParameter=DownloadsData}" />
-                                    <RadioButton Content="AI" Style="{StaticResource SettingsSubNav}" Command="{Binding SettingsVM.NavigateSectionCommand}" CommandParameter="AI" IsChecked="{Binding SettingsVM.SelectedSection,Mode=OneWay,Converter={StaticResource EqualConverter},ConverterParameter=AI}" />
                                 </StackPanel>
                             </StackPanel></ScrollViewer>
 

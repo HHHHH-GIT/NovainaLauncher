@@ -4,10 +4,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
-using System.Windows.Threading;
 using Markdig;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
+using Markdig.Extensions.Tables;
 
 namespace Launcher.App.Controls;
 
@@ -18,20 +18,16 @@ public sealed class MarkdownText : StackPanel
     public static readonly DependencyProperty EnableMarkdownProperty = DependencyProperty.Register(nameof(EnableMarkdown), typeof(bool), typeof(MarkdownText), new PropertyMetadata(true, Changed));
     public string Text { get => (string)GetValue(TextProperty); set => SetValue(TextProperty, value); }
     public bool EnableMarkdown { get => (bool)GetValue(EnableMarkdownProperty); set => SetValue(EnableMarkdownProperty, value); }
-    private bool _pending;
-    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().Build();
-    private static void Changed(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((MarkdownText)d).ScheduleRender();
-    private void ScheduleRender()
+    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().Build();
+    private static void Changed(DependencyObject d, DependencyPropertyChangedEventArgs e) => ((MarkdownText)d).Render();
+    private void Render()
     {
-        if (_pending) return;
-        _pending = true;
-        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
-        {
-            _pending = false; Children.Clear();
-            if (string.IsNullOrEmpty(Text)) return;
-            if (!EnableMarkdown) { var plain = TextBlock(); plain.Margin = new Thickness(0); plain.Text = Text; Children.Add(plain); return; }
-            RenderBlocks(Markdown.Parse(Text, Pipeline), this);
-        }));
+        // Render before the virtualizing panel measures a recycled row. A deferred render
+        // first measured every off-screen message at zero height, then moved the viewport.
+        Children.Clear();
+        if (string.IsNullOrEmpty(Text)) return;
+        if (!EnableMarkdown) { var plain = TextBlock(); plain.Margin = new Thickness(0); plain.Text = Text; Children.Add(plain); return; }
+        RenderBlocks(Markdown.Parse(Text, Pipeline), this);
     }
     private static TextBlock TextBlock()
     {
@@ -45,6 +41,8 @@ public sealed class MarkdownText : StackPanel
         {
             switch (block)
             {
+                case Markdig.Extensions.Tables.Table table:
+                    RenderTable(table, panel); break;
                 case HeadingBlock heading:
                     var title = TextBlock(); title.FontSize = heading.Level switch { 1 => 24, 2 => 21, _ => 17 };
                     title.LineHeight = double.NaN; title.FontWeight = FontWeights.SemiBold; title.Margin = new(0, 10, 0, 8);
@@ -75,6 +73,29 @@ public sealed class MarkdownText : StackPanel
                 case ContainerBlock container: RenderBlocks(container, panel); break;
             }
         }
+    }
+    private static void RenderTable(Markdig.Extensions.Tables.Table table, Panel panel)
+    {
+        var grid = new Grid { Margin = new(0, 6, 0, 12) };
+        var rows = table.OfType<Markdig.Extensions.Tables.TableRow>().ToArray();
+        var columns = rows.Select(r => r.Count).DefaultIfEmpty().Max();
+        for (int col = 0; col < columns; col++) grid.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
+        for (int rowIndex = 0; rowIndex < rows.Length; rowIndex++)
+        {
+            grid.RowDefinitions.Add(new() { Height = GridLength.Auto }); var row = rows[rowIndex];
+            for (int col = 0; col < row.Count; col++)
+            {
+                var content = new StackPanel(); RenderBlocks((Markdig.Extensions.Tables.TableCell)row[col], content);
+                if (row.IsHeader) foreach (var text in content.Children.OfType<TextBlock>()) text.FontWeight = FontWeights.SemiBold;
+                if (col < table.ColumnDefinitions.Count)
+                    foreach (var text in content.Children.OfType<TextBlock>()) text.TextAlignment = table.ColumnDefinitions[col].Alignment switch { TableColumnAlign.Center => TextAlignment.Center, TableColumnAlign.Right => TextAlignment.Right, _ => TextAlignment.Left };
+                var cell = new Border { Child = content, Padding = new(10, 8, 10, 2), BorderThickness = new(0, 0, 1, 1) };
+                cell.SetResourceReference(Border.BorderBrushProperty, "AppleCardBorderBrush");
+                if (row.IsHeader) cell.SetResourceReference(Border.BackgroundProperty, "InputBrush");
+                Grid.SetRow(cell, rowIndex); Grid.SetColumn(cell, col); grid.Children.Add(cell);
+            }
+        }
+        panel.Children.Add(grid);
     }
     private static void RenderInlines(ContainerInline? container, InlineCollection destination)
     {

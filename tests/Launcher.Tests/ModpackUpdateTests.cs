@@ -9,6 +9,7 @@ using Xunit;
 
 namespace Launcher.Tests;
 
+[Collection("AppPaths")]
 public sealed class ModpackUpdateTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "ikun-pack 中文 " + Guid.NewGuid());

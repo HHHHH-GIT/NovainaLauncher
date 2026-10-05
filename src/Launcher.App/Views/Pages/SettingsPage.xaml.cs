@@ -11,8 +11,6 @@ namespace Launcher.App.Views.Pages;
 
 public partial class SettingsPage : UserControl
 {
-    private void AiKeyChanged(object sender, RoutedEventArgs e) { if (DataContext is SettingsViewModel vm) vm.Main.AgentVM.PendingKey = ((PasswordBox)sender).Password; }
-    private async void SaveAiKeyClick(object sender, RoutedEventArgs e) { if (DataContext is SettingsViewModel vm) { await vm.Main.AgentVM.ConnectCommand.ExecuteAsync(null); SettingsAiKey.Clear(); } }
     private void CurseForgeKeyChanged(object sender, RoutedEventArgs e) { if (DataContext is SettingsViewModel vm) vm.PendingCurseForgeKey = ((PasswordBox)sender).Password; }
     private void SaveCurseForgeKeyClick(object sender, RoutedEventArgs e) { if (DataContext is SettingsViewModel vm) { vm.SaveCurseForgeKeyCommand.Execute(null); CurseForgeKeyBox.Clear(); } }
     private SettingsViewModel? _vm;

@@ -128,26 +128,26 @@ public sealed class JavaService(HttpClient http, LogService log)
         return null;
     }
 
-    public async Task<JavaRuntimeInfo> DownloadAsync(int major, IProgress<JavaDownloadProgress> progress, CancellationToken token, string? downloadDirectory = null)
+    public async Task<JavaRuntimeInfo> DownloadAsync(int major, IProgress<JavaDownloadProgress> progress, CancellationToken token, string? downloadDirectory = null, bool requireJdk = false)
     {
         await _downloadGate.WaitAsync(token).ConfigureAwait(false);
         try
         {
-            var key = Path.GetFullPath(string.IsNullOrWhiteSpace(downloadDirectory) ? AppPaths.Runtime : downloadDirectory) + "|" + major;
+            var key = Path.GetFullPath(string.IsNullOrWhiteSpace(downloadDirectory) ? AppPaths.Runtime : downloadDirectory) + "|" + major + (requireJdk ? "|jdk" : "|runtime");
             if (_recentDownloads.TryGetValue(key, out var ready) && File.Exists(ready.Path))
             { token.ThrowIfCancellationRequested(); progress.Report(new(JavaDownloadStage.Completed, 0, null, 0, [])); return ready; }
-            var installed = await DownloadLockedAsync(major, progress, token, downloadDirectory).ConfigureAwait(false);
+            var installed = await DownloadLockedAsync(major, progress, token, downloadDirectory, requireJdk).ConfigureAwait(false);
             _recentDownloads[key] = installed; return installed;
         }
         finally { _downloadGate.Release(); }
     }
-    private async Task<JavaRuntimeInfo> DownloadLockedAsync(int major, IProgress<JavaDownloadProgress> progress, CancellationToken token, string? downloadDirectory)
+    private async Task<JavaRuntimeInfo> DownloadLockedAsync(int major, IProgress<JavaDownloadProgress> progress, CancellationToken token, string? downloadDirectory, bool requireJdk)
     {
         log.Write($"正在下载 Java {major}", featured: true);
         progress.Report(new(JavaDownloadStage.Preparing, 0, null, 0, []));
         using var sources = new DownloadSources(new(true, true), token, diagnostic: message => log.Write(message), transport: new JavaTransport(http));
-        var metadata = await sources.JsonAsync($"https://api.adoptium.net/v3/assets/latest/{major}/hotspot?architecture=x64&image_type=jre&os=windows&vendor=eclipse", token).ConfigureAwait(false);
-        if (metadata.GetArrayLength() == 0)
+        var metadata = await sources.JsonAsync($"https://api.adoptium.net/v3/assets/latest/{major}/hotspot?architecture=x64&image_type={(requireJdk ? "jdk" : "jre")}&os=windows&vendor=eclipse", token).ConfigureAwait(false);
+        if (!requireJdk && metadata.GetArrayLength() == 0)
             metadata = await sources.JsonAsync($"https://api.adoptium.net/v3/assets/latest/{major}/hotspot?architecture=x64&image_type=jdk&os=windows&vendor=eclipse", token).ConfigureAwait(false);
         if (metadata.GetArrayLength() == 0) throw new InvalidOperationException($"没有可下载的 Java {major}");
         var package = metadata[0].GetProperty("binary").GetProperty("package");
@@ -158,7 +158,7 @@ public sealed class JavaService(HttpClient http, LogService log)
         if (Directory.Exists(destination))
         {
             var existing = Directory.EnumerateFiles(destination, "java.exe", SearchOption.AllDirectories).FirstOrDefault();
-            if (existing is not null && await ProbeAsync(existing, token).ConfigureAwait(false) is { } cached) return cached;
+            if (existing is not null && (!requireJdk || File.Exists(Path.Combine(Path.GetDirectoryName(existing)!, "javac.exe"))) && await ProbeAsync(existing, token).ConfigureAwait(false) is { } cached) return cached;
             throw new InvalidDataException("缓存的 Java 不可用，请选择本地 Java");
         }
         var archive = destination + ".zip.part";
@@ -183,6 +183,7 @@ public sealed class JavaService(HttpClient http, LogService log)
             var executable = Directory.EnumerateFiles(staging, "java.exe", SearchOption.AllDirectories).FirstOrDefault()
                 ?? throw new InvalidDataException("下载包中未找到 Java");
             var info = await ProbeAsync(executable, token).ConfigureAwait(false) ?? throw new InvalidDataException("下载的 Java 无法运行");
+            if (requireJdk && !File.Exists(Path.Combine(Path.GetDirectoryName(executable)!, "javac.exe"))) throw new InvalidDataException("下载包缺少 javac，不能用于 Mod 开发");
             token.ThrowIfCancellationRequested();
             Directory.Move(staging, destination);
             relay.Phase(JavaDownloadStage.Completed);

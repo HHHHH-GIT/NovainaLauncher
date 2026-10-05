@@ -17,32 +17,42 @@ public sealed class AgentContextTests
             return name == "read_game_logs" ? ToolResult.Ok("已读取日志", new { log = new string('x', 400000) }) : ToolResult.Ok("已查任务");
         });
         var client = new Client([Calls(("read_game_logs", "{\"game_id\":\"local-real\"}", "logs"), ("get_tasks", "{}", "tasks")), new([], [], 0, 0)]);
-        var session = Session(client, ops); session.SetGoal("分析并修复当前游戏，删除必须先询问");
+        var session = Session(client, ops); var events = new List<AgentUiEvent>(); session.Event += events.Add; session.SetGoal("分析并修复当前游戏，删除必须先询问");
         var run = session.SendAsync("先检查日志", Model(), "high", references: [new("game", "local-real", "冒险世界", "1.20.1 · Forge")]);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Empty(client.Compactions); Assert.True(session.ContextUsage.Percent > 45);
         Assert.True(session.ContextUsage.Categories.Single(x => x.Name == "日志内容").Tokens > 100000);
         session.RequestCompaction(); Assert.Empty(client.Compactions);
+        Assert.Contains(events, e => e.Kind == AgentUiEventKind.Compaction && e.Title == "压缩已安排");
         release.TrySetResult(); await run;
         Assert.Single(client.Compactions);
         Assert.Equal(2, client.Compactions[0].OfType<JsonObject>().Count(x => x["type"]?.ToString() == "function_call_output"));
         Assert.Equal(1, session.ContextUsage.CompactionCount); Assert.True(session.ContextUsage.LastSavedTokens > 100000);
+        Assert.Contains(events, e => e.Kind == AgentUiEventKind.Compaction && e.Title == "正在压缩上下文");
+        Assert.Contains(events, e => e.Kind == AgentUiEventKind.Compaction && e.Title == "上下文已压缩" && e.Text.Contains("释放约"));
         Assert.Contains("删除必须先询问", session.Goal);
         Assert.Contains("local-real", client.Histories[^1].ToJsonString()); Assert.Contains("先检查日志", client.Histories[^1].ToJsonString(new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
         Assert.DoesNotContain(new string('x', 1000), client.Histories[^1].ToJsonString());
+        var saved = session.Capture(); Assert.Equal(2, saved.Checkpoints!.Count);
+        Assert.Equal(2, saved.History.OfType<JsonObject>().Count(x => x["type"]?.ToString() == "function_call"));
+        Assert.Equal(2, saved.History.OfType<JsonObject>().Count(x => x["type"]?.ToString() == "function_call_output"));
+        var restored = Session(new Client([]), ops); restored.Restore(saved);
+        Assert.Equal(saved.Checkpoints.Count, restored.Capture().Checkpoints!.Count);
         session.Clear(); Assert.Empty(session.Goal); Assert.Equal(0, session.ContextUsage.CompactionCount);
     }
     [Fact] public async Task Cancelled_Or_Failed_Compaction_Retains_Original_Protocol_And_History()
     {
         var ops = new Operations((_, _) => Task.FromResult(ToolResult.Ok("结果", new { log = new string('x', 30000) })));
         var client = new Client([Calls(("read_game_logs", "{\"game_id\":\"real\"}", "logs")), new([], [], 0, 0)]);
-        var session = Session(client, ops); var model = Model() with { ContextWindow = 1000000 };
+        var session = Session(client, ops); var events = new List<AgentUiEvent>(); session.Event += events.Add; var model = Model() with { ContextWindow = 1000000 };
         await session.SendAsync("记录用户目标", model, "high");
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         client.Compact = async (_, token) => { entered.TrySetResult(); await Task.Delay(Timeout.Infinite, token); return new("不会提交"); };
         var compact = session.CompactAsync(model, "high"); await entered.Task; await session.StopAsync(); await compact;
+        Assert.Contains(events, e => e.Kind == AgentUiEventKind.Compaction && e.Title == "压缩已中止");
         Assert.Equal(0, session.ContextUsage.CompactionCount);
         client.Compact = (_, _) => throw new InvalidDataException("断流"); await session.CompactAsync(model, "high");
+        Assert.Contains(events, e => e.Kind == AgentUiEventKind.Compaction && e.Title == "压缩未完成" && e.Text.Contains("已保留"));
         Assert.Equal(0, session.ContextUsage.CompactionCount);
         Assert.Single(ops.Cancelled); // Manual compaction never cancels an installation group.
         await session.SendAsync("继续", model, "high");

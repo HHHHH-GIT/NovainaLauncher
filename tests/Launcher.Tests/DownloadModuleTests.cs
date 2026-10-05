@@ -10,6 +10,7 @@ using Xunit;
 
 namespace Launcher.Tests;
 
+[Collection("AppPaths")]
 public sealed class DownloadModuleTests
 {
     [Fact] public void OptiFine_Requires_Exact_Declared_Forge_And_Game()

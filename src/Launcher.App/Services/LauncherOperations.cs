@@ -24,6 +24,8 @@ public sealed class LauncherOperations(MainViewModel main) : ILauncherOperations
     private Task UIAsync(Func<Task> action) => main.UiDispatcher.InvokeAsync(action).Task.Unwrap();
     public bool IsDirectoryBusy(string directory) => _writes.ContainsKey(Path.GetFullPath(directory));
     public void ResetHandles() => _handles.Clear();
+    public IReadOnlyList<(string Id, JavaRuntimeInfo Java)> GetDevelopmentJavas() => main.UiDispatcher.CheckAccess()
+        ? main.SettingsVM.InstalledJavas.Select(j => (Handle("java", j.Path, j), j)).ToArray() : main.UiDispatcher.Invoke(GetDevelopmentJavas);
     public IReadOnlyList<AgentReference> GetReferences() => main.UiDispatcher.CheckAccess() ? ReferencesOnUi() : main.UiDispatcher.Invoke(ReferencesOnUi);
     private IReadOnlyList<AgentReference> ReferencesOnUi() => main.VersionsVM.Versions
         .Select(v => new AgentReference("game", Local(v), v.GameName, $"Minecraft {v.MinecraftVersion} · {v.Loader} {v.LoaderVersion}".Trim()))
@@ -56,6 +58,7 @@ public sealed class LauncherOperations(MainViewModel main) : ILauncherOperations
     public async Task<AgentApproval> DescribeSensitiveAsync(string name, JsonObject args, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        if (name == "launch_game") { var v = S(args, "game_id") is { Length: > 0 } id ? Resolve<VersionInfo>(id) : await UI(() => main.CurrentVersion ?? throw new InvalidOperationException("请先选择游戏")); return new("启动测试游戏", $"使用当前账户启动“{v.GameName}”（{v.MinecraftVersion} · {v.Loader}）？默认工作台只编译；确认后才会打开游戏。"); }
         if (name == "delete_game") { var v = Resolve<VersionInfo>(S(args, "game_id")); AgentPathGuard.Within(v.Root, Path.Combine(v.Root, "versions", v.Id)); return new("删除游戏", $"将“{v.GameName}”及独立目录移入回收站？"); }
         var item = Resolve<(VersionInfo Version, VersionContentItem Item)>(S(args, "item_id"));
         AgentPathGuard.Within(DirectoryFor(item.Version), item.Item.Path);
@@ -73,7 +76,7 @@ public sealed class LauncherOperations(MainViewModel main) : ILauncherOperations
                     return await UI(() => ToolResult.Ok("已读取启动器状态", new {
                         games = main.VersionsVM.Versions.Take(250).Select(VersionData).ToArray(),
                         accounts = main.AccountsVM.Accounts.Select(x => new { id = Handle("account", x.Id, x), name = x.Name, type = x.KindLabel, current = main.CurrentAccount?.Id == x.Id }).ToArray(),
-                        javas = main.SettingsVM.InstalledJavas.Select(x => new { id = Handle("java", x.Path, x), major = x.Major, version = x.Version.ToString(), architecture = x.Architecture }).ToArray(),
+                        javas = main.SettingsVM.InstalledJavas.Select(x => new { id = Handle("java", x.Path, x), major = x.Major, version = x.Version.ToString(), architecture = x.Architecture, jdk = File.Exists(Path.Combine(Path.GetDirectoryName(x.Path)!, "javac.exe")) }).ToArray(),
                         memoryMb = main.SettingsVM.MemoryMb, availableMemoryMb = main.SettingsVM.AvailableMemoryMb, smartMemory = main.SettingsVM.SmartMemory,
                         launchState = main.LaunchState.ToString(), busy = main.DownloadsVM.Queue.IsBusy }));
                 case "list_game_versions":
@@ -125,9 +128,9 @@ public sealed class LauncherOperations(MainViewModel main) : ILauncherOperations
                 }
                 case "import_modpack":
                 {
-                    var path = await UI(() => { var picker = new OpenFileDialog { Title = "选择整合包", Filter = "整合包 (*.zip;*.mrpack)|*.zip;*.mrpack" }; return picker.ShowDialog() == true ? picker.FileName : null; });
+                    var path = context.Interaction.FullAccess && a["path"] is { } importPath ? Path.GetFullPath(importPath.ToString()) : await UI(() => { var picker = new OpenFileDialog { Title = "选择整合包", Filter = "整合包 (*.zip;*.mrpack)|*.zip;*.mrpack" }; return picker.ShowDialog() == true ? picker.FileName : null; });
                     if (path is null) return ToolResult.Fail("未选择整合包");
-                    AgentPathGuard.Within(Path.GetDirectoryName(path)!, path);
+                    if (!context.Interaction.FullAccess) AgentPathGuard.Within(Path.GetDirectoryName(path)!, path);
                     var archiveName = await Task.Run(() => ModpackService.InspectArchiveAsync(path, token), token);
                     var plan = await UI(() => new InstallPlan(S(a, "name", archiveName), main.Settings.GameRoot, null, null, null, null, null, null, Sources, main.Settings.JavaDownloadDirectory, main.SettingsVM.InstalledJavas.ToArray(), LocalArchive: path));
                     return await InstallAsync(plan, context);
@@ -135,9 +138,9 @@ public sealed class LauncherOperations(MainViewModel main) : ILauncherOperations
                 case "export_modpack":
                 {
                     var version = Resolve<VersionInfo>(S(a, "game_id")); var dir = DirectoryFor(version);
-                    var path = await UI(() => { var p = new SaveFileDialog { Title = "导出整合包", FileName = version.GameName + ".mrpack", Filter = "整合包 (*.mrpack)|*.mrpack", OverwritePrompt = true }; return p.ShowDialog() == true ? p.FileName : null; });
+                    var path = context.Interaction.FullAccess && a["path"] is { } exportPath ? Path.GetFullPath(exportPath.ToString()) : await UI(() => { var p = new SaveFileDialog { Title = "导出整合包", FileName = version.GameName + ".mrpack", Filter = "整合包 (*.mrpack)|*.mrpack", OverwritePrompt = true }; return p.ShowDialog() == true ? p.FileName : null; });
                     if (path is null) return ToolResult.Fail("未选择导出位置");
-                    AgentPathGuard.Within(Path.GetDirectoryName(path)!, path);
+                    if (!context.Interaction.FullAccess) AgentPathGuard.Within(Path.GetDirectoryName(path)!, path);
                     await WriteAsync(dir, async () => await new ModpackService().ExportAsync(version, dir, path, new InlineProgress<string>(m => context.Emit(new(AgentUiEventKind.Operation, "正在导出整合包", m, "export-" + context.GroupId))), token));
                     return ToolResult.Ok("整合包已导出", new { game = version.GameName, file = Path.GetFileName(path) });
                 }
@@ -219,7 +222,7 @@ public sealed class LauncherOperations(MainViewModel main) : ILauncherOperations
                         EmitJava(new(taskId, $"Java {major}", state, label, p.Stage == JavaDownloadStage.Downloading ? new(p.DownloadedBytes, p.TotalBytes, p.BytesPerSecond, p.Connections) : null) { OverallProgress = new((int)p.Stage, 4, label) });
                     });
                     JavaRuntimeInfo info;
-                    try { info = await main.Java.DownloadAsync(major, report, token, main.Settings.JavaDownloadDirectory); }
+                    try { info = await main.Java.DownloadAsync(major, report, token, main.Settings.JavaDownloadDirectory, S(a, "package_type") == "jdk"); }
                     catch (Exception error) { if (last is not null) EmitJava(last with { State = token.IsCancellationRequested ? DownloadTaskState.Cancelled : DownloadTaskState.Failed, Message = token.IsCancellationRequested ? "已取消" : "准备失败", Error = token.IsCancellationRequested ? null : main.Log.Redact(error.Message) }); throw; }
                     await UI(() => { if (!main.SettingsVM.InstalledJavas.Any(x => x.Path == info.Path)) main.SettingsVM.InstalledJavas.Insert(0, info); main.AutoSelectJava(); }); return ToolResult.Ok($"Java {major} 已就绪");
                 }

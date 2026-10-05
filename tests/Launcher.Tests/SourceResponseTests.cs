@@ -7,6 +7,7 @@ using Xunit;
 
 namespace Launcher.Tests;
 
+[Collection("AppPaths")]
 public sealed class SourceResponseTests
 {
     [Theory]
