@@ -7,9 +7,11 @@ include=['README.md','package.json','package-lock.json','tsconfig.json','render.
 with ZipFile(out,'w',ZIP_DEFLATED) as z:
     for name in include:
         z.write(root/name,'Novaina-Promo/'+name)
-    for directory in ['src','licenses']:
+    for directory in ['src','licenses','public/native']:
         for p in (root/directory).rglob('*'):
             if p.is_file():z.write(p,'Novaina-Promo/'+p.relative_to(root).as_posix())
     for name in ['logo.png','steve.png','intro-sfx.wav']:
         z.write(root/'public'/name,'Novaina-Promo/public/'+name)
+    for name in ['Program.cs','Capture.csproj']:
+        z.write(root/'capture'/name,'Novaina-Promo/capture/'+name)
 print(out, out.stat().st_size)

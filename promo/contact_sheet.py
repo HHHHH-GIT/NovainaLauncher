@@ -1,24 +1,24 @@
 from pathlib import Path
 from PIL import Image, ImageDraw
-import wave
-import numpy as np
+import json
+import sys
 
-root=Path(__file__).parent/'output'
-frames=sorted(root.glob('frame-*.png'))
-canvas=Image.new('RGB',(1440,((len(frames)+2)//3)*296),'#10151f')
-draw=ImageDraw.Draw(canvas)
-for i,p in enumerate(frames):
-    im=Image.open(p).convert('RGB');im.thumbnail((470,264))
-    x=(i%3)*480+5;y=(i//3)*296+5
-    canvas.paste(im,(x,y));draw.text((x,y+269),f'{int(p.stem.split("-")[1])/30:.2f}s',fill='#b5c5dc')
-canvas.save(root/'storyboard.jpg',quality=94)
-with wave.open(str(root/'music-analysis.wav'),'rb') as w:
-    a=np.frombuffer(w.readframes(w.getnframes()),dtype=np.int16).astype(float)/32768
-en=np.sqrt((a[:len(a)//160*160].reshape(-1,160)**2).mean(axis=1))
-on=np.maximum(np.diff(en,prepend=en[0]),0)
-scores=[]
-for bpm in np.arange(90,150,.1):
-    lag=60/bpm*50
-    shifted=np.interp(np.arange(len(on))-lag,np.arange(len(on)),on,left=0,right=0)
-    scores.append((float(np.dot(on,shifted)),round(float(bpm),1)))
-print('Strongest beat periods:', sorted(scores,reverse=True)[:5])
+root = Path(__file__).parent / 'output'
+verified = '--verified' in sys.argv
+if verified:
+    manifest = json.loads((root / 'verification.json').read_text())
+    frames = [(t, root / 'verified' / f'{t:.2f}.png') for t in manifest['sampledFrames']]
+else:
+    manifest = json.loads((root / 'render-stills.json').read_text())
+    frames = [(n / 30, root / f'frame-{n:04d}.png') for n in manifest['sampledFrames']]
+canvas = Image.new('RGB', (1440, ((len(frames) + 2) // 3) * 296), '#10151f')
+draw = ImageDraw.Draw(canvas)
+for i, (t, path) in enumerate(frames):
+    im = Image.open(path).convert('RGB')
+    im.thumbnail((470, 264))
+    x, y = (i % 3) * 480 + 5, (i // 3) * 296 + 5
+    canvas.paste(im, (x, y))
+    draw.text((x, y + 269), f'{t:.2f}s', fill='#b5c5dc')
+output = root / ('verified-storyboard.jpg' if verified else 'storyboard.jpg')
+canvas.save(output, quality=94)
+print(output)

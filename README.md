@@ -6,7 +6,7 @@
 
 **从一句想法，到整个世界。**
 
-面向 Windows 的 Minecraft Java 版启动器 · AI 助手 · 弹幕日志 · 3D 皮肤
+面向 Windows 的 Minecraft Java 版启动器 · AI 双模式 · Mod 开发工作台 · 弹幕日志 · 3D 皮肤
 
 [![Release](https://img.shields.io/github/v/release/HHHHH-GIT/NovainaLauncher?color=007AFF&label=下载)](https://github.com/HHHHH-GIT/NovainaLauncher/releases/latest)
 [![MIT](https://img.shields.io/badge/License-MIT-AF52DE)](LICENSE)
@@ -16,6 +16,8 @@
 [下载完整版](https://github.com/HHHHH-GIT/NovainaLauncher/releases/download/v1.0.0/NovainaLauncher-1.0.0-win-x64.exe) · [下载 Lite](https://github.com/HHHHH-GIT/NovainaLauncher/releases/download/v1.0.0/NovainaLauncher-1.0.0-win-x64-lite.exe) · [新手指南](docs/QUICKSTART.md) · [提交问题](https://github.com/HHHHH-GIT/NovainaLauncher/issues)
 
 </div>
+
+Novaina 将游戏下载、版本管理、皮肤预览与 AI 助手放进同一个桌面应用。你可以使用熟悉的页面管理 Minecraft，也可以开启 AI Mode：用一句话准备游戏，或在工作台里把一个 Mod 创意逐步变成源码与 JAR。
 
 ## 第一次使用
 
@@ -33,9 +35,13 @@
 
 Java 与游戏文件单独获取；3D 皮肤预览需要 [Microsoft WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。AI 是可选功能，普通登录和启动无需配置 AI Key。
 
+**获取最新源码：** 本仓库的 `main` 分支包含最新开发源码；Release 中的 EXE 和源码 ZIP 是对应发布构建的快照。查看源码建议使用 [main 分支 ZIP](https://github.com/HHHHH-GIT/NovainaLauncher/archive/refs/heads/main.zip) 或 `git clone`，运行启动器则下载上面的 EXE。
+
 ## 一句话，开始行动
 
-打开顶栏 **AI Mode**，配置自己的 DeepSeek API Key，随后就可以用中文描述目标：
+打开顶栏 **AI Mode**，在独立 AI 设置页配置自己的 DeepSeek API Key 和模型。左上角可以切换 **基础模式** 与 **工作台**，两种模式分别管理会话。
+
+### 基础模式：准备好你的下一个世界
 
 > “我想玩一个探索类整合包，帮我选一个并安装。”
 >
@@ -45,15 +51,35 @@ Java 与游戏文件单独获取；3D 皮肤预览需要 [Microsoft WebView2 Run
 >
 > “把当前游戏导出为整合包。”
 
-**基础模式**查询本地状态、提出选择题、调用安装与管理工具，并用任务卡片展示真实结果。**工作台**面向 Mod 开发：检查环境、获取官方模板、小步编辑源码、编译与交付 JAR，需要准备游戏/Java 等业务时派发独立基础子代理。默认审批模式下，删除、覆盖等敏感操作会先展示具体对象，等待你确认。
-
-左侧会话列表可收起，两种模式分别加密保存历史；右上角“设置”集中配置 AI 连接与模型，普通设置不再混入 AI 项。工作台默认只构建，不自动启动游戏；审批模式构建需确认信任，目录限制不是系统沙箱。输入区可切换到授权模式，经警告确认后开放完整终端与文件工具，免除逐项审批；切换会话或退出 AI 会恢复审批模式。详见 [AI 工作台指南](docs/AI-WORKBENCH.md)。
-
-模型旁的圆环显示上下文用量与分类估算，超过 45% 后在操作完成的安全边界自动压缩。输入 `/compact` 可主动压缩，`/goal` 可设置本次会话持续目标，`@` 可引用已识别的游戏、Java 与账户。连续工具调用集中展示，完成后自动折叠；回答过的问题展开时只保留你的答案。详细用法见 [新手指南](docs/QUICKSTART.md)。
+AI 会先查询实际版本、账户和候选资源；需要确认偏好时集中提出选择题，然后调用启动器的安装、管理、日志与启动服务。执行区展示任务进度和结果，连续工具调用归入同一组，完成后自动折叠；回答过的问题展开时只保留你的答案。
 
 ![AI 问答与选择卡片](docs/images/ai.png)
 
-*WPF 界面离屏截图，使用演示问题；不代表真实 API 操作验收。*
+*当前原生 WPF 界面，使用隔离的演示问题与会话。*
+
+### 工作台：从创意，到可以编译的 Mod
+
+> “做一个 Fabric 1.21.1 的星莓派 Mod，加入新食物和合成配方，最后给我 JAR。”
+
+1. 新建或选择项目，确认游戏版本、加载器和需求。
+2. 检查 JDK 与开发环境，获取 Fabric、Forge 或 NeoForge 官方模板，逐步编辑源码、资源与配方。
+3. 执行 Gradle 构建，检查错误并修复，交付 JAR、产物信息和已验证／未验证清单。
+
+工作台内置开发指南与官方来源，可查询依赖源码。需要安装游戏、准备 Java 或选择账户时，由独立基础子代理处理启动器业务。默认以编译、检查与打包为目标，游戏内表现需要另外测试；编译通过不等于任何 Mod 都能正常运行。完整流程见 [AI 工作台指南](docs/AI-WORKBENCH.md)。
+
+![AI 工作台与构建结果](docs/images/ai-workbench-dark.png)
+
+*原生 WPF 工作台，演示“星莓派”开发流程；图中构建结果为脚本示例，并非真实构建验收记录。*
+
+### 会话、上下文与权限
+
+- **独立设置与会话：** AI 配置集中在 AI 页右上角“设置”；左侧会话列表可收起，两种模式的历史分别在本机加密保存。
+- **可见的上下文：** 圆环显示总用量及分类估算；超过模型容量的 45% 后，在完整操作结束时调用模型生成压缩摘要，保留目标、关键状态与最近交互。压缩失败保留原上下文，界面历史继续可见。
+- **快捷输入：** `/compact` 手动压缩；`/goal` 设置本次会话持续目标；`@` 引用已识别的游戏、Java 与账户。
+- **审批模式：** 默认对删除、覆盖等敏感操作展示具体对象并等待确认；工作台使用授权的项目目录与开发工具。
+- **授权模式：** 在输入区确认警告后，开放完整终端与文件工具，取消逐项审批及项目范围限制；仍受当前 Windows 用户权限约束。切换会话或退出 AI 后恢复审批模式。
+
+详细用法见 [新手指南](docs/QUICKSTART.md)。项目范围限制不是操作系统沙箱；停止会中止本轮未完成任务，不撤销已完成的修改。
 
 ## 你的世界，由你组织
 
@@ -62,7 +88,7 @@ Java 与游戏文件单独获取；3D 皮肤预览需要 [Microsoft WebView2 Run
 | 游戏与加载器 | 安装原版、Forge、Fabric、NeoForge、OptiFine；支持明确匹配的 Forge + OptiFine |
 | 模组与整合包 | 热门模组、中文关键词、文件版本筛选；在线整合包、ZIP/MRPACK 导入和本地导出 |
 | 版本管理 | 单击切换、双击回首页；统一管理 Mod、存档、资源包和光影包 |
-| 账户与皮肤 | 微软、LittleSkin、离线账户；皮肤头像、3D 预览和 PNG 导入 |
+| 账户与皮肤 | 微软、LittleSkin、离线账户；皮肤头像、3D 预览，按账户类型提供换皮入口 |
 | 日志弹幕 | 精选/全部、屏蔽规则、三种样式；完整日志同步保留 |
 | 运行环境 | Java 自动选择、独立 runtime、智能内存与每版本配置 |
 | 下载任务 | 国内镜像优先、校验与来源回退、取消、稳定的总进度和连接详情 |
@@ -74,15 +100,25 @@ Java 与游戏文件单独获取；3D 皮肤预览需要 [Microsoft WebView2 Run
 
 ## 让日志与形象，也有自己的表达
 
-弹幕让关键阶段、警告和游戏输出融入界面；屏蔽只影响展示，不删完整日志。皮肤预览支持旋转、缩放、经典与纤细模型。
+弹幕让关键阶段、警告和游戏输出融入界面；屏蔽只影响展示，不删完整日志。皮肤预览支持旋转和缩放，头像同步显示皮肤头部与帽子层；无缓存时使用 Steve。
+
+微软账户支持 PNG 导入、模型选择与上传。LittleSkin 通过官方网页换皮，随后在启动器刷新；离线账户保存本地皮肤，用于启动器头像与预览。
 
 ![3D 皮肤预览](docs/images/skins.png)
 
-*皮肤功能宣传示意，使用 HTML/skinview3d 重现；不是实际账户录屏。LittleSkin 换皮请到官方网页，随后在启动器刷新；离线皮肤用于启动器预览。*
+*新版宣传片画面：原生 WPF 账户页与同款 skinview3d 合成，使用演示账户与默认 Steve。*
 
 ![像素超新星开场动画](docs/images/startup.gif)
 
 *实际 WPF 开场动画的桌面采样。动画遵循设置中的舒缓、性能与关闭选项。*
+
+## 90 秒，认识 Novaina
+
+新版宣传片延续 WWDC 风格：像素超新星开场，依次展示下载、游戏管理、皮肤与弹幕，再聚焦 AI 基础模式、上下文管理和 Mod 开发工作台。界面素材来自当前原生 WPF 控件，Remotion 负责运镜与剪辑。
+
+![Novaina 宣传片：Mod 工作台与 JAR 交付](docs/images/promo.jpg)
+
+查看 [宣传片源码与制作说明](promo/README.md)。截图及流程使用演示数据；开源工程包含界面素材与原创开场音效，商业配乐及含该配乐的成片不随仓库分发，重新渲染需自行提供有权使用的音乐。
 
 ## 常见问题
 
@@ -134,4 +170,4 @@ dotnet run --project src/Launcher.App/Launcher.App.csproj -c Release
 
 原创项目代码采用 [MIT](LICENSE)。第三方库、Minecraft 素材与加载器标志保留各自许可，见 [第三方声明](docs/THIRD-PARTY-NOTICES.md)。Minecraft 为 Mojang/Microsoft 的产品；本项目为独立社区项目。
 
-1.0.0 发布检查区分构建、离线资源检查、真实联网流程和人工桌面验证，详见 [发布记录](docs/releases/v1.0.0.md)。
+验证分别记录构建、自动检查、真实联网流程与桌面行为，详见 [1.0.0 发布记录](docs/releases/v1.0.0.md)、[AI 工作台与可靠性更新](docs/history/AI-RELIABILITY-20261005.md) 和 [新版宣传片记录](docs/history/PROMO-20261006.md)。
